@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estilhaçamento 3D Voronoi Sem Frestas - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js com Câmara Perspetiva
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões do plano focal da câmara para cobertura 100%
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // 4. PLANO DE FUNDO CONTÍNUO
+    const bgGeom = new THREE.PlaneGeometry(vp.width, vp.height);
+    const bgMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 1.0
+    });
+    const bgMesh = new THREE.Mesh(bgGeom, bgMat);
+    bgMesh.position.set(0, 0, -0.06);
+    bgMesh.visible = false;
+    scene.add(bgMesh);
+
+    // 5. Criação da Malha de Fragmentação 3D
+    const shatterGroup = new THREE.Group();
+    shatterGroup.visible = false;
+    scene.add(shatterGroup);
+
+    let shards = [];
+
+    const matCurrent = new THREE.MeshBasicMaterial({
+      map: null,
+      side: THREE.DoubleSide
+    });
+
+    const matNext = new THREE.MeshBasicMaterial({
+      map: null,
+      side: THREE.DoubleSide
+    });
+
+    function buildShatterGrid() {
+      while (shatterGroup.children.length > 0) {
+        const obj = shatterGroup.children[0];
+        shatterGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+      }
+      shards = [];
+
+      const gridX = 14;
+      const gridY = 9;
+      const stepX = vp.width / gridX;
+      const stepY = vp.height / gridY;
+
+      const points = [];
+      for (let j = 0; j <= gridY; j++) {
+        points[j] = [];
+        for (let i = 0; i <= gridX; i++) {
+          const isEdgeX = (i === 0 || i === gridX);
+          const isEdgeY = (j === 0 || j === gridY);
+          const jitterX = isEdgeX ? 0 : (Math.random() - 0.5) * stepX * 0.35;
+          const jitterY = isEdgeY ? 0 : (Math.random() - 0.5) * stepY * 0.35;
+          points[j][i] = new THREE.Vector2(
+            (i * stepX) - vp.width / 2 + jitterX,
+            vp.height / 2 - (j * stepY) + jitterY
+          );
+        }
+      }
+
+      function createShard(p1, p2, p3) {
+        const centroidX = (p1.x + p2.x + p3.x) / 3;
+        const centroidY = (p1.y + p2.y + p3.y) / 3;
+
+        const geom = new THREE.BufferGeometry();
+
+        const vertices = new Float32Array([
+          p1.x - centroidX, p1.y - centroidY, 0,
+          p2.x - centroidX, p2.y - centroidY, 0,
+          p3.x - centroidX, p3.y - centroidY, 0
+        ]);
+
+        const uvs = new Float32Array([
+          (p1.x + vp.width / 2) / vp.width, (p1.y + vp.height / 2) / vp.height,
+          (p2.x + vp.width / 2) / vp.width, (p2.y + vp.height / 2) / vp.height,
+          (p3.x + vp.width / 2) / vp.width, (p3.y + vp.height / 2) / vp.height
+        ]);
+
+        geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+        const mesh = new THREE.Mesh(geom, matCurrent);
+        mesh.position.set(centroidX, centroidY, 0);
+
+        const distFromCenter = Math.sqrt(centroidX * centroidX + centroidY * centroidY);
+        const dirX = centroidX / (distFromCenter || 1);
+        const dirY = centroidY / (distFromCenter || 1);
+
+        shatterGroup.add(mesh);
+        shards.push({
+          mesh,
+          homeX: centroidX,
+          homeY: centroidY,
+          dirX,
+          dirY,
+          distFromCenter
+        });
+      }
+
+      for (let j = 0; j < gridY; j++) {
+        for (let i = 0; i < gridX; i++) {
+          const pTopLeft = points[j][i];
+          const pTopRight = points[j][i + 1];
+          const pBottomLeft = points[j + 1][i];
+          const pBottomRight = points[j + 1][i + 1];
+
+          if ((i + j) % 2 === 0) {
+            createShard(pTopLeft, pTopRight, pBottomLeft);
+            createShard(pTopRight, pBottomRight, pBottomLeft);
+          } else {
+            createShard(pTopLeft, pTopRight, pBottomRight);
+            createShard(pTopLeft, pBottomRight, pBottomLeft);
+          }
+        }
+      }
+    }
+
+    buildShatterGrid();
+
+    // 6. Transição 3D
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      matNext.map = textures[nextIndex];
+      matNext.needsUpdate = true;
+
+      bgMat.map = textures[nextIndex];
+      bgMat.needsUpdate = true;
+      bgMat.opacity = 0.0;
+
+      const maxDist = Math.max(...shards.map(s => s.distFromCenter));
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          matCurrent.map = textures[nextIndex];
+          matCurrent.needsUpdate = true;
+
+          shards.forEach(s => {
+            s.mesh.material = matCurrent;
+            s.mesh.position.set(s.homeX, s.homeY, 0);
+            s.mesh.rotation.set(0, 0, 0);
+            s.mesh.scale.set(1, 1, 1);
+          });
+
+          bgMat.opacity = 1.0;
+          currentIndex = nextIndex;
+          isAnimating = false;
+        }
+      });
+
+      tl.to(bgMat, {
+        opacity: 1.0,
+        duration: 0.7,
+        ease: "power1.inOut"
+      }, 0.2);
+
+      shards.forEach(s => {
+        const delay = (s.distFromCenter / maxDist) * 0.35;
+        const burstZ = 1.6 + Math.random() * 2.2;
+        const burstX = s.homeX + s.dirX * (0.8 + Math.random() * 1.2);
+        const burstY = s.homeY + s.dirY * (0.8 + Math.random() * 1.2);
+
+        tl.to(s.mesh.position, {
+          x: burstX,
+          y: burstY,
+          z: burstZ,
+          duration: 0.85,
+          ease: "power2.out"
+        }, delay);
+
+        tl.to(s.mesh.rotation, {
+          x: (Math.random() - 0.5) * Math.PI * 2.5,
+          y: (Math.random() - 0.5) * Math.PI * 2.5,
+          z: (Math.random() - 0.5) * Math.PI,
+          duration: 0.85,
+          ease: "power2.out"
+        }, delay);
+
+        tl.add(() => {
+          s.mesh.material = matNext;
+        }, delay + 0.8);
+
+        tl.to(s.mesh.position, {
+          x: s.homeX,
+          y: s.homeY,
+          z: 0,
+          duration: 0.95,
+          ease: "back.out(1.1)"
+        }, delay + 0.8);
+
+        tl.to(s.mesh.rotation, {
+          x: 0,
+          y: 0,
+          z: 0,
+          duration: 0.95,
+          ease: "power2.out"
+        }, delay + 0.8);
+      });
+    }
+
+    // 7. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+
+      bgMesh.geometry.dispose();
+      bgMesh.geometry = new THREE.PlaneGeometry(vp.width, vp.height);
+
+      buildShatterGrid();
+    });
+
+    // 8. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (bgMesh.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      matCurrent.map = textures[0];
+      matCurrent.needsUpdate = true;
+
+      matNext.map = textures[1] || textures[0];
+      matNext.needsUpdate = true;
+
+      bgMat.map = textures[0];
+      bgMat.needsUpdate = true;
+      bgMat.opacity = 1.0;
+
+      bgMesh.visible = true;
+      shatterGroup.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

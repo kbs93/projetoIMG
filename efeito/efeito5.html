@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bokens Sobrepostos 3D - CHAT-DF</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+html, body {
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      overflow: hidden;
+    }
+
+    #webgl-container {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="webgl-container"></div>
+
+  <script>
+    // 1. CENA, CÂMERA E RENDERER 3D
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('webgl-container').appendChild(renderer.domElement);
+
+    // FUNÇÃO PARA GERAR A TEXTURA DE BOKEH DESFOCADO (Borda translúcida da foto)
+    function createDenseBokehTexture(colorHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const cx = 64, cy = 64, radius = 56;
+
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, '#ffffff'); // Centro iluminado
+      grad.addColorStop(0.3, colorHex);
+      grad.addColorStop(0.8, colorHex);
+      grad.addColorStop(1, 'rgba(0,0,0,0)'); // Borda desfocada
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // PALETA DE CORES VIBRANTES IGUAL À FOTO
+    const colorPalette = [
+      '#00ff66', // Verde
+      '#0066ff', // Azul
+      '#ff007f', // Rosa/Magenta
+      '#ff1100', // Vermelho
+      '#ff8800', // Laranja
+      '#9900ff'  // Roxo
+    ];
+
+    const textures = colorPalette.map(color => createDenseBokehTexture(color));
+
+    // 2. CRIAÇÃO DAS BOLINHAS AGRUPADAS E SOBREPOSTAS
+    const totalBokeh = 220; // Alta densidade para ficarem juntinhas
+    const bokehGroup = new THREE.Group();
+    const bokehList = [];
+
+    let boundsX = 35;
+    let boundsY = 30;
+
+    function resetBokehPosition(sprite, isFirstTime = false) {
+      // Cria aglomerados (clusters) em vez de espalhar uniformemente
+      const clusterOffsetX = (Math.random() - 0.5) * 20;
+      
+      sprite.position.x = clusterOffsetX + (Math.random() - 0.5) * (boundsX * 1.8);
+      
+      if (isFirstTime) {
+        sprite.position.y = (Math.random() - 0.5) * (boundsY * 2.2);
+      } else {
+        sprite.position.y = boundsY + 5 + Math.random() * 12;
+      }
+      
+      // Profundidade Z curta para que elas se cruzem e sobreponham na tela
+      sprite.position.z = (Math.random() - 0.5) * 25;
+    }
+
+    for (let i = 0; i < totalBokeh; i++) {
+      const textureIndex = i % textures.length;
+      const mat = new THREE.SpriteMaterial({
+        map: textures[textureIndex],
+        transparent: true,
+        blending: THREE.AdditiveBlending, // Faz a sobreposição brilhar forte onde se cruzam
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(mat);
+      
+      // Mistura de tamanhos (pequenas e grandes sobrepostas)
+      const baseScale = 3.5 + Math.random() * 6.5; 
+      sprite.scale.set(baseScale, baseScale, 1);
+
+      resetBokehPosition(sprite, true);
+      bokehGroup.add(sprite);
+
+      bokehList.push({
+        sprite: sprite,
+        baseScale: baseScale,
+        fallSpeed: 0.025 + Math.random() * 0.035, // Queda bem devagar
+        pulseSpeed: 0.6 + Math.random() * 1.8,    // Pulsação suave de luz
+        pulseOffset: Math.random() * Math.PI * 2,
+        driftSpeed: (Math.random() - 0.5) * 0.005
+      });
+    }
+
+    scene.add(bokehGroup);
+
+    // 3. RESPONSIVIDADE DEDICADA PARA MOBILE
+    function updateLayout() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const aspect = width / height;
+
+      camera.aspect = aspect;
+
+      if (aspect < 1) { // Celular
+        camera.position.z = 45;
+        boundsX = 18;
+        boundsY = 35;
+      } else { // Computador
+        camera.position.z = 35;
+        boundsX = 35;
+        boundsY = 28;
+      }
+
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener('resize', updateLayout);
+    updateLayout();
+
+    // 4. ANIMAÇÃO AUTOMÁTICA (Sem interferência de mouse)
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = clock.getElapsedTime();
+
+      bokehList.forEach(b => {
+        // Queda lenta mantendo a densidade do grupo
+        b.sprite.position.y -= b.fallSpeed;
+        b.sprite.position.x += Math.sin(time + b.pulseOffset) * b.driftSpeed;
+
+        // Reinicia no topo sem perder a aglomeração
+        if (b.sprite.position.y < -boundsY - 5) {
+          resetBokehPosition(b.sprite, false);
+        }
+
+        // Pulsação contínua de opacidade e tamanho
+        const pulse = Math.sin(time * b.pulseSpeed + b.pulseOffset);
+        const scaleFactor = 1 + pulse * 0.22;
+
+        b.sprite.scale.set(
+          b.baseScale * scaleFactor,
+          b.baseScale * scaleFactor,
+          1
+        );
+
+        b.sprite.material.opacity = 0.6 + (pulse + 1) * 0.2;
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

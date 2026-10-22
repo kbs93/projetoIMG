@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Morfologia Líquida Orgânica - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #050505;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis de estado declaradas com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js (Câmera Ortográfica)
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+    camera.position.z = 1;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Shaders GLSL - Morfologia com Simplex Noise e Vórtice Fluido
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D uTextureCurrent;
+      uniform sampler2D uTextureNext;
+      uniform float uProgress;
+      uniform float uTime;
+      uniform vec2 uResolution;
+      varying vec2 vUv;
+
+      // Mantém a proporção real das imagens sem achatar ou esticar
+      vec2 getCoverUv(vec2 uv, vec2 screenRes) {
+        float rs = screenRes.x / screenRes.y;
+        float ri = 16.0 / 9.0;
+        vec2 newUv = uv;
+        if (rs > ri) {
+          newUv.y = (uv.y - 0.5) * (ri / rs) + 0.5;
+        } else {
+          newUv.x = (uv.x - 0.5) * (rs / ri) + 0.5;
+        }
+        return newUv;
+      }
+
+      // Algoritmo Simplex Noise 2D para deformação líquida orgânica
+      vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+      float snoise(vec2 v) {
+        const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+        vec2 i  = floor(v + dot(v, C.yy));
+        vec2 x0 = v -   i + dot(i, C.xx);
+        vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+        vec4 x12 = x0.xyxy + C.xxzz;
+        x12.xy -= i1;
+        i = mod289(i);
+        vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+        vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+        m = m*m;
+        m = m*m;
+        vec3 x = 2.0 * fract(p * C.www) - 1.0;
+        vec3 h = abs(x) - 0.5;
+        vec3 ox = floor(x + 0.5);
+        vec3 a0 = x - ox;
+        m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+        vec3 g;
+        g.x  = a0.x  * x0.x  + h.x  * x0.y;
+        g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+        return 130.0 * dot(m, g);
+      }
+
+      void main() {
+        vec2 uv = getCoverUv(vUv, uResolution);
+
+        // Curva da intensidade líquida (ápice em 0.5 de progresso)
+        float morphIntensity = sin(uProgress * 3.1415926);
+
+        // Campo vetorial de fluido usando ruído duplo e tempo contínuo
+        float noiseVal = snoise(uv * 4.0 + vec2(uTime * 0.4, uProgress * 2.0));
+        float noiseVal2 = snoise(uv * 8.0 - vec2(uProgress * 1.5, uTime * 0.3));
+
+        // Vetor de fluxo líquido turbilhonar
+        vec2 flow = vec2(noiseVal, noiseVal2) * morphIntensity * 0.15;
+
+        // Aberração cromática fluida (os canais RGB se separam na deformação)
+        float rgbOffset = morphIntensity * 0.04;
+
+        // Imagem Atual se dissolvendo no fluido
+        vec2 uvCurrent = uv + flow * (1.0 - uProgress);
+        vec4 colCurrent;
+        colCurrent.r = texture2D(uTextureCurrent, uvCurrent + vec2(rgbOffset, 0.0)).r;
+        colCurrent.g = texture2D(uTextureCurrent, uvCurrent).g;
+        colCurrent.b = texture2D(uTextureCurrent, uvCurrent - vec2(rgbOffset, 0.0)).b;
+        colCurrent.a = 1.0;
+
+        // Próxima Imagem emergindo do fluido
+        vec2 uvNext = uv - flow * uProgress;
+        vec4 colNext;
+        colNext.r = texture2D(uTextureNext, uvNext + vec2(rgbOffset * 0.5, 0.0)).r;
+        colNext.g = texture2D(uTextureNext, uvNext).g;
+        colNext.b = texture2D(uTextureNext, uvNext - vec2(rgbOffset * 0.5, 0.0)).b;
+        colNext.a = 1.0;
+
+        // Mistura orgânica guiada pelo ruído para transição fluida
+        float blend = smoothstep(0.0, 1.0, uProgress + noiseVal * morphIntensity * 0.3);
+        gl_FragColor = mix(colCurrent, colNext, clamp(blend, 0.0, 1.0));
+      }
+    `;
+
+    // 4. Uniforms e Mesh
+    const uniforms = {
+      uTextureCurrent: { value: null },
+      uTextureNext: { value: null },
+      uProgress: { value: 0.0 },
+      uTime: { value: 0.0 },
+      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms
+    });
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.visible = false;
+    scene.add(mesh);
+
+    // 5. Transição Suave com GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      uniforms.uTextureCurrent.value = textures[currentIndex];
+      uniforms.uTextureNext.value = textures[nextIndex];
+      uniforms.uProgress.value = 0.0;
+
+      gsap.to(uniforms.uProgress, {
+        value: 1.0,
+        duration: 2.0,
+        ease: "power2.inOut",
+        onComplete: () => {
+          currentIndex = nextIndex;
+          uniforms.uTextureCurrent.value = textures[currentIndex];
+          uniforms.uProgress.value = 0.0;
+          isAnimating = false;
+        }
+      });
+    }
+
+    // 6. Redimensionamento responsivo
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    });
+
+    // 7. Loop de Renderização com relógio interno
+    const clock = new THREE.Clock();
+    function render() {
+      requestAnimationFrame(render);
+      if (mesh.visible) {
+        uniforms.uTime.value = clock.getElapsedTime();
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      if (uniforms.uTextureCurrent) uniforms.uTextureCurrent.value = textures[0];
+      if (uniforms.uTextureNext) uniforms.uTextureNext.value = textures[1] || textures[0];
+      uniforms.uProgress.value = 0.0;
+      mesh.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 4500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

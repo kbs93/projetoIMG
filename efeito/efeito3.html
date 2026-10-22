@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chuva de Estrelas Responsiva - CHAT-DF</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+body {
+      width: 100vw;
+      height: 100vh;
+      background-color: transparent;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #webgl-container {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="webgl-container"></div>
+
+  <script>
+    // 1. CENA, CÂMERA E RENDERER
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita o pixelRatio para alta performance
+    document.getElementById('webgl-container').appendChild(renderer.domElement);
+
+    // Variaveis de controle de limites responsivos
+    let boundsX = 45;
+    let boundsY = 35;
+
+    // TEXTURAS
+    function createCircleTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32; canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 32, 32);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createGlowTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.2, '#00e1ff');
+      grad.addColorStop(0.6, 'rgba(0, 180, 255, 0.3)');
+      grad.addColorStop(1, 'rgba(0, 212, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createTrailTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 16; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 128, 0, 0);
+      grad.addColorStop(0, 'rgba(0, 225, 255, 0.9)');
+      grad.addColorStop(0.4, 'rgba(0, 150, 255, 0.4)');
+      grad.addColorStop(1, 'rgba(0, 100, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 16, 128);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const circleTexture = createCircleTexture();
+    const glowTexture = createGlowTexture();
+    const trailTexture = createTrailTexture();
+
+    // 2. FUNDO DE ESTRELAS
+    const starCount = 800;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(starCount * 3);
+
+    for (let i = 0; i < starCount * 3; i += 3) {
+      starPos[i] = (Math.random() - 0.5) * 160;
+      starPos[i + 1] = (Math.random() - 0.5) * 120;
+      starPos[i + 2] = (Math.random() - 0.5) * 80;
+    }
+
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({
+      map: circleTexture,
+      size: 0.6,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const starField = new THREE.Points(starGeo, starMat);
+    scene.add(starField);
+
+    // 3. ESTRELAS CADENTES
+    const totalMeteors = 15;
+    const meteors = [];
+
+    function createMeteor() {
+      const group = new THREE.Group();
+      const trailLength = 8 + Math.random() * 8;
+
+      const trailGeo = new THREE.PlaneGeometry(0.35, trailLength);
+      const trailMat = new THREE.MeshBasicMaterial({
+        map: trailTexture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const trail = new THREE.Mesh(trailGeo, trailMat);
+      trail.position.y = trailLength / 2;
+      group.add(trail);
+
+      const headMat = new THREE.SpriteMaterial({
+        map: glowTexture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const head = new THREE.Sprite(headMat);
+      head.scale.set(2.8, 2.8, 1);
+      group.add(head);
+
+      resetMeteorPosition(group, true);
+      scene.add(group);
+
+      return {
+        group: group,
+        speed: 0.12 + Math.random() * 0.1
+      };
+    }
+
+    function resetMeteorPosition(group, isFirstTime = false) {
+      group.position.x = (Math.random() - 0.5) * (boundsX * 2);
+      
+      if (isFirstTime) {
+        group.position.y = -boundsY + Math.random() * (boundsY * 2);
+      } else {
+        group.position.y = boundsY + 5 + Math.random() * 15;
+      }
+      
+      group.position.z = (Math.random() - 0.5) * 40;
+    }
+
+    for (let i = 0; i < totalMeteors; i++) {
+      meteors.push(createMeteor());
+    }
+
+    // 4. FUNÇÃO DE RESPONSIVIDADE AVANÇADA
+    function updateLayout() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const aspect = width / height;
+
+      camera.aspect = aspect;
+      
+      // Ajusta a distância da câmera em dispositivos móveis (telas estreitas)
+      if (aspect < 1) {
+        camera.position.z = 55; // Afasta a câmera em celulares para manter o campo de visão amplo
+        boundsX = 25;
+        boundsY = 45;
+      } else {
+        camera.position.z = 40; // Distância padrão para computadores/tablets
+        boundsX = 45;
+        boundsY = 35;
+      }
+
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    // Aplica a responsividade ao iniciar e ao redimensionar
+    window.addEventListener('resize', updateLayout);
+    updateLayout();
+
+    // 5. ANIMAÇÃO
+// 5. ANIMAÇÃO
+    function animate() {
+      requestAnimationFrame(animate);
+
+      starField.rotation.z += 0.0001;
+
+      meteors.forEach(m => {
+        m.group.position.y -= m.speed;
+
+        // Limite inferior dinâmico com base na altura da tela
+        if (m.group.position.y < -boundsY - 5) {
+          resetMeteorPosition(m.group, false);
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

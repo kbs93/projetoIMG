@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dobradura Origami 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js (Câmera Ortográfica ecrã inteiro)
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+    camera.position.z = 1;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Shaders GLSL - Física de Enrolamento de Papel (Cylinder Page Curl)
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D uTextureCurrent;
+      uniform sampler2D uTextureNext;
+      uniform float uProgress;
+      uniform vec2 uResolution;
+      varying vec2 vUv;
+
+      vec2 getCoverUv(vec2 uv, vec2 screenRes) {
+        float rs = screenRes.x / screenRes.y;
+        float ri = 16.0 / 9.0;
+        vec2 newUv = uv;
+        if (rs > ri) {
+          newUv.y = (uv.y - 0.5) * (ri / rs) + 0.5;
+        } else {
+          newUv.x = (uv.x - 0.5) * (rs / ri) + 0.5;
+        }
+        return newUv;
+      }
+
+      void main() {
+        vec2 uv = getCoverUv(vUv, uResolution);
+        vec2 curlDir = normalize(vec2(1.0, 1.0));
+        float radius = 0.18;
+        float progressOffset = -0.4 + uProgress * 2.1;
+        float d = dot(uv, curlDir) - progressOffset;
+
+        vec4 colNext = texture2D(uTextureNext, uv);
+        vec4 colCurrent = texture2D(uTextureCurrent, uv);
+        vec4 finalColor;
+
+        if (d <= 0.0) {
+          float shadowDist = -d;
+          float shadow = smoothstep(0.0, 0.25, shadowDist);
+          finalColor = mix(colNext * 0.45, colNext, shadow);
+        } else if (d > 0.0 && d < 3.1415926 * radius) {
+          float angle = d / radius;
+          vec2 rolledUv = uv - curlDir * (d - sin(angle) * radius);
+          vec4 colBack = texture2D(uTextureCurrent, rolledUv);
+          float specular = pow(sin(angle), 3.0) * 0.55;
+          float selfShadow = 0.65 + 0.35 * cos(angle);
+          finalColor = colBack * selfShadow + vec4(vec3(specular), 0.0);
+        } else {
+          finalColor = colCurrent;
+        }
+
+        gl_FragColor = finalColor;
+      }
+    `;
+
+    // 4. Uniforms e Mesh
+    const uniforms = {
+      uTextureCurrent: { value: null },
+      uTextureNext: { value: null },
+      uProgress: { value: 0.0 },
+      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms
+    });
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.visible = false;
+    scene.add(mesh);
+
+    // 5. Transição com GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      uniforms.uTextureCurrent.value = textures[currentIndex];
+      uniforms.uTextureNext.value = textures[nextIndex];
+      uniforms.uProgress.value = 0.0;
+
+      gsap.to(uniforms.uProgress, {
+        value: 1.0,
+        duration: 2.0,
+        ease: "power2.inOut",
+        onComplete: () => {
+          currentIndex = nextIndex;
+          uniforms.uTextureCurrent.value = textures[currentIndex];
+          uniforms.uProgress.value = 0.0;
+          isAnimating = false;
+        }
+      });
+    }
+
+    // 6. Redimensionamento
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    });
+
+    // 7. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (mesh.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      if (uniforms.uTextureCurrent) uniforms.uTextureCurrent.value = textures[0];
+      if (uniforms.uTextureNext) uniforms.uTextureNext.value = textures[1] || textures[0];
+      uniforms.uProgress.value = 0.0;
+      mesh.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3000);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

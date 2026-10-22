@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mosaico de Cartões 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões do plano focal da câmera
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // 4. Criação da Grelha de Fatias 3D (6 colunas x 4 linhas)
+    const cols = 6;
+    const rows = 4;
+    const tileGroup = new THREE.Group();
+    tileGroup.visible = false;
+    scene.add(tileGroup);
+
+    let tiles = [];
+
+    function buildTiles() {
+      while (tileGroup.children.length > 0) {
+        const obj = tileGroup.children[0];
+        tileGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      }
+      tiles = [];
+
+      const tileWidth = vp.width / cols;
+      const tileHeight = vp.height / rows;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const geom = new THREE.PlaneGeometry(tileWidth, tileHeight);
+
+          const uvAttr = geom.attributes.uv;
+          const uMin = x / cols;
+          const uMax = (x + 1) / cols;
+          const vMin = 1.0 - (y + 1) / rows;
+          const vMax = 1.0 - y / rows;
+
+          uvAttr.setXY(0, uMin, vMax);
+          uvAttr.setXY(1, uMax, vMax);
+          uvAttr.setXY(2, uMin, vMin);
+          uvAttr.setXY(3, uMax, vMin);
+          uvAttr.needsUpdate = true;
+
+          const mat = new THREE.MeshBasicMaterial({
+            map: textures[currentIndex] || null,
+            side: THREE.DoubleSide
+          });
+
+          const mesh = new THREE.Mesh(geom, mat);
+          const posX = (x + 0.5) * tileWidth - vp.width / 2;
+          const posY = vp.height / 2 - (y + 0.5) * tileHeight;
+          mesh.position.set(posX, posY, 0);
+
+          tileGroup.add(mesh);
+          tiles.push({ mesh, mat, col: x, row: y });
+        }
+      }
+    }
+
+    buildTiles();
+
+    // 5. Transição com GSAP em Cascata Suave
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      const tl = gsap.timeline({
+        onComplete: () => {
+          currentIndex = nextIndex;
+          tiles.forEach(tile => {
+            tile.mesh.rotation.y = 0;
+            tile.mesh.position.z = 0;
+          });
+          isAnimating = false;
+        }
+      });
+
+      tiles.forEach(tile => {
+        const delay = ((tile.col + tile.row) / (cols + rows)) * 0.5;
+
+        tl.to(tile.mesh.rotation, {
+          y: Math.PI / 2,
+          duration: 0.6,
+          ease: "power2.in",
+          onComplete: () => {
+            tile.mat.map = textures[nextIndex];
+            tile.mat.needsUpdate = true;
+          }
+        }, delay);
+
+        tl.to(tile.mesh.position, {
+          z: 0.5,
+          duration: 0.6,
+          ease: "power2.out"
+        }, delay);
+
+        tl.to(tile.mesh.rotation, {
+          y: Math.PI,
+          duration: 0.2,
+          ease: "power2.out"
+        }, delay + 0.6);
+
+        tl.to(tile.mesh.position, {
+          z: 0.0,
+          duration: 0.6,
+          ease: "power2.in"
+        }, delay + 0.6);
+      });
+    }
+
+    // 6. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+      buildTiles();
+    });
+
+    // 7. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (tileGroup.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      tiles.forEach(t => {
+        t.mat.map = textures[0];
+        t.mat.needsUpdate = true;
+      });
+
+      tileGroup.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3000);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

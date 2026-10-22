@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partículas 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões do plano focal da câmera
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // 4. Criação da Malha de Partículas
+    const countX = 250;
+    const countY = 160;
+    const totalPoints = countX * countY;
+
+    const positions = new Float32Array(totalPoints * 3);
+    const uvs = new Float32Array(totalPoints * 2);
+    const randomOffsets = new Float32Array(totalPoints * 3);
+
+    function buildParticlesData() {
+      for (let y = 0; y < countY; y++) {
+        for (let x = 0; x < countX; x++) {
+          const i = y * countX + x;
+
+          const u = x / (countX - 1);
+          const v = y / (countY - 1);
+
+          positions[i * 3 + 0] = (u - 0.5) * vp.width;
+          positions[i * 3 + 1] = (0.5 - v) * vp.height;
+          positions[i * 3 + 2] = 0.0;
+
+          uvs[i * 2 + 0] = u;
+          uvs[i * 2 + 1] = 1.0 - v;
+
+          const angle = Math.random() * Math.PI * 2;
+          const force = 1.0 + Math.random() * 3.5;
+          randomOffsets[i * 3 + 0] = Math.cos(angle) * force;
+          randomOffsets[i * 3 + 1] = Math.sin(angle) * force;
+          randomOffsets[i * 3 + 2] = (Math.random() - 0.2) * 5.0;
+        }
+      }
+    }
+
+    buildParticlesData();
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setAttribute('aRandom', new THREE.BufferAttribute(randomOffsets, 3));
+
+    // 5. Custom Vertex e Fragment Shader
+    const vertexShader = `
+      uniform float uProgress;
+      uniform float uPointSize;
+      attribute vec3 aRandom;
+      varying vec2 vUv;
+      varying float vDist;
+
+      void main() {
+        vUv = uv;
+
+        float wave = sin(uProgress * 3.1415926);
+        vec3 newPos = position;
+
+        float angle = wave * 2.5 * length(position.xy);
+        mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+        newPos.xy += rot * (aRandom.xy * wave * 1.5);
+
+        newPos.z += aRandom.z * wave;
+        vDist = wave;
+
+        vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+
+        gl_PointSize = (uPointSize / -mvPosition.z) * (1.0 + wave * 1.8);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D uTextureCurrent;
+      uniform sampler2D uTextureNext;
+      uniform float uProgress;
+      varying vec2 vUv;
+      varying float vDist;
+
+      void main() {
+        vec4 colCurrent = texture2D(uTextureCurrent, vUv);
+        vec4 colNext = texture2D(uTextureNext, vUv);
+
+        vec4 finalColor = mix(colCurrent, colNext, smoothstep(0.15, 0.85, uProgress));
+
+        vec2 coord = gl_PointCoord - vec2(0.5);
+        if (length(coord) > 0.5) {
+          discard;
+        }
+
+        gl_FragColor = finalColor;
+      }
+    `;
+
+    const uniforms = {
+      uTextureCurrent: { value: null },
+      uTextureNext: { value: null },
+      uProgress: { value: 0.0 },
+      uPointSize: { value: (window.innerWidth / countX) * 1.8 * window.devicePixelRatio }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms,
+      transparent: true,
+      depthTest: false
+    });
+
+    const particleSystem = new THREE.Points(geometry, material);
+    particleSystem.visible = false;
+    scene.add(particleSystem);
+
+    // 6. Transição com GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      uniforms.uTextureCurrent.value = textures[currentIndex];
+      uniforms.uTextureNext.value = textures[nextIndex];
+      uniforms.uProgress.value = 0.0;
+
+      gsap.to(uniforms.uProgress, {
+        value: 1.0,
+        duration: 2.2,
+        ease: "power2.inOut",
+        onComplete: () => {
+          currentIndex = nextIndex;
+          uniforms.uTextureCurrent.value = textures[currentIndex];
+          uniforms.uProgress.value = 0.0;
+          isAnimating = false;
+        }
+      });
+    }
+
+    // 7. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+      buildParticlesData();
+      geometry.attributes.position.needsUpdate = true;
+      uniforms.uPointSize.value = (window.innerWidth / countX) * 1.8 * window.devicePixelRatio;
+    });
+
+    // 8. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (particleSystem.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      if (uniforms.uTextureCurrent) uniforms.uTextureCurrent.value = textures[0];
+      if (uniforms.uTextureNext) uniforms.uTextureNext.value = textures[1] || textures[0];
+      uniforms.uProgress.value = 0.0;
+      particleSystem.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

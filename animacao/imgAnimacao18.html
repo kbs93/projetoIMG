@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blocos Isométricos 3D em Queda - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões do campo visual
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // Fundo fixo
+    const bgGeom = new THREE.PlaneGeometry(vp.width, vp.height);
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const bgMesh = new THREE.Mesh(bgGeom, bgMat);
+    bgMesh.position.set(0, 0, -0.05);
+    bgMesh.visible = false;
+    scene.add(bgMesh);
+
+    // 4. Montagem dos Cubos Sólidos 3D
+    const cols = 8;
+    const rows = 5;
+    const blockGroup = new THREE.Group();
+    blockGroup.visible = false;
+    scene.add(blockGroup);
+
+    let blocks = [];
+
+    const frontMat = new THREE.MeshBasicMaterial({ map: null });
+    const topMat = new THREE.MeshBasicMaterial({ color: 0x8a8e94 });
+    const leftMat = new THREE.MeshBasicMaterial({ color: 0x303236 });
+    const sideMat = new THREE.MeshBasicMaterial({ color: 0x484b52 });
+    const bottomMat = new THREE.MeshBasicMaterial({ color: 0x202225 });
+
+    const boxMaterials = [sideMat, leftMat, topMat, bottomMat, frontMat, sideMat];
+
+    function buildBlocks() {
+      while (blockGroup.children.length > 0) {
+        const obj = blockGroup.children[0];
+        blockGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+      }
+      blocks = [];
+
+      const blockWidth = vp.width / cols;
+      const blockHeight = vp.height / rows;
+      const blockDepth = Math.min(blockWidth, blockHeight) * 0.9;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const geom = new THREE.BoxGeometry(blockWidth, blockHeight, blockDepth);
+
+          const uvAttr = geom.attributes.uv;
+          const uMin = c / cols;
+          const uMax = (c + 1) / cols;
+          const vMin = 1.0 - (r + 1) / rows;
+          const vMax = 1.0 - r / rows;
+
+          uvAttr.setXY(16, uMin, vMax);
+          uvAttr.setXY(17, uMax, vMax);
+          uvAttr.setXY(18, uMin, vMin);
+          uvAttr.setXY(19, uMax, vMin);
+          uvAttr.needsUpdate = true;
+
+          const mesh = new THREE.Mesh(geom, boxMaterials);
+
+          const finalX = (c + 0.5) * blockWidth - vp.width / 2;
+          const finalY = vp.height / 2 - (r + 0.5) * blockHeight;
+          const finalZ = 0;
+
+          mesh.position.set(finalX, vp.height + 3.0, finalZ);
+          mesh.visible = false;
+
+          blockGroup.add(mesh);
+
+          blocks.push({
+            mesh,
+            col: c,
+            row: r,
+            finalX,
+            finalY,
+            finalZ
+          });
+        }
+      }
+    }
+
+    buildBlocks();
+
+    // 5. Transição com GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      frontMat.map = textures[nextIndex];
+      frontMat.needsUpdate = true;
+
+      blocks.forEach(b => {
+        b.mesh.visible = true;
+        b.mesh.position.set(
+          b.finalX,
+          vp.height / 2 + 3.0 + Math.random() * 2.0,
+          1.5 + Math.random() * 0.8
+        );
+        b.mesh.rotation.set(
+          -0.55 + (Math.random() - 0.5) * 0.2,
+          0.65 + (Math.random() - 0.5) * 0.2,
+          (Math.random() - 0.5) * 0.25
+        );
+      });
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          bgMat.map = textures[nextIndex];
+          bgMat.needsUpdate = true;
+
+          blocks.forEach(b => {
+            b.mesh.visible = false;
+          });
+
+          currentIndex = nextIndex;
+          isAnimating = false;
+        }
+      });
+
+      blocks.forEach(b => {
+        const delay = ((rows - 1 - b.row) * 0.1) + (b.col * 0.025) + (Math.random() * 0.1);
+
+        tl.to(b.mesh.position, {
+          y: b.finalY,
+          duration: 1.3,
+          ease: "bounce.out"
+        }, delay);
+
+        tl.to(b.mesh.position, {
+          z: b.finalZ,
+          duration: 1.1,
+          ease: "power2.inOut"
+        }, delay);
+
+        tl.to(b.mesh.rotation, {
+          x: 0,
+          y: 0,
+          z: 0,
+          duration: 1.1,
+          ease: "power2.out"
+        }, delay);
+      });
+    }
+
+    // 6. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+
+      bgMesh.geometry.dispose();
+      bgMesh.geometry = new THREE.PlaneGeometry(vp.width, vp.height);
+
+      buildBlocks();
+    });
+
+    // 7. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (bgMesh.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      bgMat.map = textures[0];
+      bgMat.needsUpdate = true;
+      bgMesh.visible = true;
+
+      frontMat.map = textures[1] || textures[0];
+      frontMat.needsUpdate = true;
+      blockGroup.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

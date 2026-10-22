@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motion Canvas 3D</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+    
+    <!-- 1. NAVBAR INSTITUCIONAL SUPERIOR -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo-icon">▶</span>
+        <h1>Motion Canvas <span class="brand-sub">3D</span></h1>
+      </div>
+
+      <!-- Links de navegação para Desktop -->
+      <nav class="nav-desktop" aria-label="Navegação Principal">
+        <a href="#quem-somos" class="nav-item">Quem Somos</a>
+        <a href="#informacoes" class="nav-item">Informações</a>
+        <a href="#contato" class="nav-item">Contato</a>
+      </nav>
+
+      <!-- Botão Hambúrguer para Mobile -->
+      <button id="btnHamburger" class="btn-hamburger" aria-label="Abrir menu lateral" type="button">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </header>
+
+    <!-- 2. MENU LATERAL DESLIZANTE (DRAWER) -->
+    <div id="navOverlay" class="nav-overlay" aria-hidden="true"></div>
+    <aside id="navDrawer" class="nav-drawer" aria-label="Menu Lateral">
+      <div class="drawer-header">
+        <div class="brand">
+          <span class="logo-icon">▶</span>
+          <span>Motion Canvas <strong class="brand-sub">3D</strong></span>
+        </div>
+        <button id="btnCloseDrawer" class="btn-close-drawer" aria-label="Fechar menu lateral" type="button">&times;</button>
+      </div>
+
+      <nav class="drawer-links" aria-label="Navegação Mobile">
+        <a href="#quem-somos" class="drawer-item">Quem Somos</a>
+        <a href="#informacoes" class="drawer-item">Informações</a>
+        <a href="#contato" class="drawer-item">Contato</a>
+      </nav>
+    </aside>
+
+    <!-- CORPO DA APLICAÇÃO (DIV) -->
+    <div class="main-content">
+      
+      <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
+    <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
+      <div class="sidebar-media" aria-label="Galeria de Imagens">
+        <div class="sidebar-header">
+          <h2>Imagens (<span id="imgCount">0</span>/6)</h2>
+          <label for="fileInput" class="btn-add-photos">+ Adicionar ate 6 fotos</label>
+          <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+        </div>
+        <div id="mediaGrid" class="media-grid"></div>
+      </div>
+
+
+      <!-- SEÇÃO DO PALCO / PLAYER 3D -->
+      <section class="stage-section" aria-label="Palco de Visualização 3D">
+        
+        <!-- Toolbar Superior do Player: Seletor de Tamanho / Proporções -->
+        <div class="stage-toolbar">
+          <div class="ratio-dropdown-container">
+            <button id="btnRatioSelect" class="btn-ratio-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="ratio-icon">▢</span>
+              <span id="currentRatioLabel">Vertical 9:16</span>
+              <span class="dropdown-arrow">▾</span>
+            </button>
+
+            <!-- Dropdown Menu de Proporções -->
+            <div id="ratioMenu" class="ratio-menu" role="menu">
+              <button class="ratio-option" data-ratio="16/9" data-label="Largo 16:9" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-16-9"></span>
+                <div class="opt-info">
+                  <strong>Largo 16:9</strong>
+                  <small>YouTube e sites de streaming</small>
+                </div>
+              </button>
+
+              <button class="ratio-option active" data-ratio="9/16" data-label="Vertical 9:16" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-9-16"></span>
+                <div class="opt-info">
+                  <strong>Vertical 9:16</strong>
+                  <small>Reels do Instagram e TikTok</small>
+                </div>
+              </button>
+
+              <button class="ratio-option" data-ratio="1/1" data-label="Quadrado 1:1" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-1-1"></span>
+                <div class="opt-info">
+                  <strong>Quadrado 1:1</strong>
+                  <small>Postagens no Instagram</small>
+                </div>
+              </button>
+
+              <button class="ratio-option" data-ratio="4/3" data-label="Clássico 4:3" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-4-3"></span>
+                <div class="opt-info">
+                  <strong>Clássico 4:3</strong>
+                  <small>Formato tradicional</small>
+                </div>
+              </button>
+
+              <button class="ratio-option" data-ratio="4/5" data-label="Redes Sociais 4:5" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-4-5"></span>
+                <div class="opt-info">
+                  <strong>Redes Sociais 4:5</strong>
+                  <small>Feed vertical otimizado</small>
+                </div>
+              </button>
+
+              <button class="ratio-option" data-ratio="21/9" data-label="Cinema 21:9" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-21-9"></span>
+                <div class="opt-info">
+                  <strong>Cinema 21:9</strong>
+                  <small>Ultrawide cinematográfico</small>
+                </div>
+              </button>
+
+              <button class="ratio-option" data-ratio="2/3" data-label="Retrato 2:3" type="button" role="menuitem">
+                <span class="opt-check">✓</span>
+                <span class="opt-icon-rect rect-2-3"></span>
+                <div class="opt-info">
+                  <strong>Retrato 2:3</strong>
+                  <small>Fotografia vertical</small>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+<!-- Contêiner do Vídeo e Canvas 3D -->
+       <figure id="canvasWrapper" class="canvas-wrapper">
+          <iframe id="animFrame" src="animacao/imgAnimacao.html" style="width: 100%; height: 100%; border: none; display: block; background: #000;"></iframe>
+          <iframe id="overlayFrame" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; background: transparent; z-index: 10; display: none;"></iframe>
+
+          <!-- Barra Flutuante de Gravação no Player -->
+          <div class="player-controls">
+            <span id="recordTimer" class="timer-display">00:00 / 00:10</span>
+            <button id="btnRecord" class="btn-record" type="button">
+              <span class="record-dot"></span>
+              <span class="btn-text">GRAVAR 10s</span>
+            </button>
+            <a id="btnDownload" class="btn-download" style="display: none;" download="motion-canvas-3d.webm">
+              Baixar Vídeo
+            </a>
+          </div>
+        </figure>
+      </section>
+
+    </div>
+<!-- BARRA DE OVERLAYS / EFEITOS POR CIMA -->
+<div class="overlays-bar" aria-label="Efeitos por cima da imagem">
+      <span class="overlays-title">Efeitos:</span>
+      <div class="overlays-track" id="overlaysTrack"></div>
+    </div>
+
+    <!-- 4. BARRA INFERIOR COM OS 23 EFEITOS -->
+    <footer class="footer-effects" aria-label="Seleção de Efeitos 3D">
+      <div class="effects-track" id="effectsTrack"></div>
+    </footer>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

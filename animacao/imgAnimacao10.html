@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cubo Monolítico 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #08080a;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    let currentRotationY = 0;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js - Câmera Perspectiva Real e Névoa de Estúdio
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x08080a, 0.15);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 5.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // 3. Luzes
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const pointLight = new THREE.PointLight(0xffffff, 1.2, 20);
+    pointLight.position.set(2, 3, 4);
+    scene.add(pointLight);
+
+    // 4. Geometria do Prisma 3D
+    const geometry = new THREE.BoxGeometry(3.55, 2.0, 3.55);
+
+    // Materiais padrão escuros até as fotos chegarem
+    const materials = [
+      new THREE.MeshStandardMaterial({ color: 0x111115, roughness: 0.2 }), // Direita (+X)
+      new THREE.MeshStandardMaterial({ color: 0x111115 }), // Esquerda (-X)
+      new THREE.MeshStandardMaterial({ color: 0x111115 }), // Cima (+Y)
+      new THREE.MeshStandardMaterial({ color: 0x050508 }), // Baixo (-Y)
+      new THREE.MeshStandardMaterial({ color: 0x111115, roughness: 0.2 }), // Frente (+Z)
+      new THREE.MeshStandardMaterial({ color: 0x111115 })  // Fundo (-Z)
+    ];
+
+    const cube = new THREE.Mesh(geometry, materials);
+    cube.visible = false;
+    scene.add(cube);
+
+    // 5. Transição Cinematográfica: Rotação 3D + Zoom Out/In de Câmera
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      
+      materials[0].map = textures[nextIndex];
+      materials[0].needsUpdate = true;
+
+      const timeline = gsap.timeline({
+        onComplete: () => {
+          materials[4].map = textures[nextIndex];
+          materials[4].needsUpdate = true;
+          cube.rotation.y = 0;
+          currentRotationY = 0;
+          currentIndex = nextIndex;
+          isAnimating = false;
+        }
+      });
+
+      timeline.to(cube.rotation, {
+        y: currentRotationY - Math.PI / 2,
+        duration: 1.8,
+        ease: "power3.inOut"
+      }, 0);
+
+      timeline.to(camera.position, {
+        z: 6.8,
+        duration: 0.9,
+        ease: "power2.out"
+      }, 0);
+
+      timeline.to(camera.position, {
+        z: 5.2,
+        duration: 0.9,
+        ease: "power2.in"
+      }, 0.9);
+    }
+
+    // 6. Redimensionamento
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix;
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 7. Loop de Renderização
+    const clock = new THREE.Clock();
+    function render() {
+      requestAnimationFrame(render);
+      const time = clock.getElapsedTime();
+
+      if (cube.visible && !isAnimating) {
+        cube.position.y = Math.sin(time * 1.5) * 0.04;
+        cube.rotation.x = Math.sin(time * 0.8) * 0.02;
+      }
+
+      renderer.render(scene, camera);
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      // Alimenta as faces do cubo com as texturas reais
+      materials[4].map = textures[0];
+      materials[4].needsUpdate = true;
+      materials[0].map = textures[1] || textures[0];
+      materials[0].needsUpdate = true;
+
+      cube.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3000);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

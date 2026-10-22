@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transição Vidro Quebrado 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Container sem imagens fixas para evitar erros 404 -->
+  <div id="image-source-list"></div>
+
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis de controlo declaradas com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js (Câmara Ortográfica cobrindo exatamente o ecrã)
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+    camera.position.z = 1;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Shaders GLSL - Estilhaçamento de Vidro e Refração Geométrica
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D uTextureCurrent;
+      uniform sampler2D uTextureNext;
+      uniform float uProgress;
+      uniform vec2 uResolution;
+      varying vec2 vUv;
+
+      // Mantém a proporção real da imagem para não esticar (Object-fit: cover)
+      vec2 getCoverUv(vec2 uv, vec2 screenRes) {
+        float rs = screenRes.x / screenRes.y;
+        float ri = 16.0 / 9.0;
+        vec2 newUv = uv;
+        if (rs > ri) {
+          newUv.y = (uv.y - 0.5) * (ri / rs) + 0.5;
+        } else {
+          newUv.x = (uv.x - 0.5) * (rs / ri) + 0.5;
+        }
+        return newUv;
+      }
+
+      // Função de ruído para gerar os vértices e faces do vidro quebrado
+      vec2 hash2(vec2 p) {
+        return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+      }
+
+      // Diagrama de Voronoi: cria células irregulares de vidro
+      vec3 voronoi(vec2 x) {
+        vec2 n = floor(x);
+        vec2 f = fract(x);
+        vec2 mg, mr;
+        float md = 8.0;
+
+        for (int j = -1; j <= 1; j++) {
+          for (int i = -1; i <= 1; i++) {
+            vec2 g = vec2(float(i), float(j));
+            vec2 o = hash2(n + g);
+            vec2 r = g + o - f;
+            float d = dot(r, r);
+
+            if (d < md) {
+              md = d;
+              mr = r;
+              mg = g;
+            }
+          }
+        }
+        return vec3(sqrt(md), mg + n);
+      }
+
+      void main() {
+        vec2 uv = getCoverUv(vUv, uResolution);
+
+        // Gera a malha de estilhaços de vidro com base na densidade
+        vec2 gridUv = uv * vec2(12.0, 7.0);
+        vec3 v = voronoi(gridUv);
+        
+        // Direção e rotação de cada fragmento individual
+        vec2 cellId = v.yz;
+        vec2 shardDir = normalize(hash2(cellId) - 0.5);
+        
+        // Curva de deslocamento (estilhaçamento no meio da animação)
+        float shatterCurve = sin(uProgress * 3.1415926);
+        float shatterAmount = shatterCurve * 0.12;
+
+        // Deslocamento dos fragmentos de vidro
+        vec2 offset = shardDir * shatterAmount;
+
+        // Refração e aberração prismática na borda de cada estilhaço
+        float edge = smoothstep(0.0, 0.15, v.x);
+        float refraction = (1.0 - edge) * shatterCurve * 0.05;
+
+        // Amostra a imagem atual sendo quebrada
+        vec2 uvCurrent = uv + offset + vec2(refraction * 0.5, -refraction * 0.5);
+        vec4 colCurrent;
+        colCurrent.r = texture2D(uTextureCurrent, uvCurrent + offset * 0.2).r;
+        colCurrent.g = texture2D(uTextureCurrent, uvCurrent).g;
+        colCurrent.b = texture2D(uTextureCurrent, uvCurrent - offset * 0.2).b;
+        colCurrent.a = 1.0;
+
+        // Amostra a nova imagem a montar-se por trás
+        vec2 uvNext = uv - offset * (1.0 - uProgress);
+        vec4 colNext = texture2D(uTextureNext, uvNext);
+
+        // Brilho especular nas arestas dos vidros durante o impacto
+        float glassGlint = pow(1.0 - edge, 3.0) * shatterCurve * 0.8;
+
+        // Mistura as duas fotos e adiciona a luminosidade das arestas
+        vec4 finalColor = mix(colCurrent, colNext, uProgress);
+        finalColor.rgb += vec3(glassGlint);
+
+        gl_FragColor = finalColor;
+      }
+    `;
+
+    // 4. Geometria plana e Material com valores seguros
+    const uniforms = {
+      uTextureCurrent: { value: null },
+      uTextureNext: { value: null },
+      uProgress: { value: 0.0 },
+      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms
+    });
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.visible = false;
+    scene.add(mesh);
+
+    // 5. Transição com GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      uniforms.uTextureCurrent.value = textures[currentIndex];
+      uniforms.uTextureNext.value = textures[nextIndex];
+      uniforms.uProgress.value = 0.0;
+
+      gsap.to(uniforms.uProgress, {
+        value: 1.0,
+        duration: 1.8,
+        ease: "power3.inOut",
+        onComplete: () => {
+          currentIndex = nextIndex;
+          uniforms.uTextureCurrent.value = textures[currentIndex];
+          uniforms.uProgress.value = 0.0;
+          isAnimating = false;
+        }
+      });
+    }
+
+    // 6. Redimensionamento
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    });
+
+    // 7. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (mesh.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // 8. Padrão universal de receção e injeção de fotos
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      if (uniforms.uTextureCurrent) uniforms.uTextureCurrent.value = textures[0];
+      if (uniforms.uTextureNext) uniforms.uTextureNext.value = textures[1] || textures[0];
+      uniforms.uProgress.value = 0.0;
+      mesh.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 4500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

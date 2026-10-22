@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leque Radial Origami 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões do campo de visão total
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // Plano de Fundo
+    const bgGeom = new THREE.PlaneGeometry(vp.width, vp.height);
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const bgMesh = new THREE.Mesh(bgGeom, bgMat);
+    bgMesh.position.set(0, 0, -0.05);
+    bgMesh.visible = false;
+    scene.add(bgMesh);
+
+    // 4. Montagem das Pás do Leque Radial 3D
+    const fanGroup = new THREE.Group();
+    fanGroup.visible = false;
+    scene.add(fanGroup);
+
+    const numBlades = 18;
+    const anglePerBlade = (Math.PI * 2) / numBlades;
+    let blades = [];
+    let radius = Math.sqrt((vp.width / 2) ** 2 + (vp.height / 2) ** 2) * 1.1;
+
+    const fanMat = new THREE.MeshBasicMaterial({
+      map: null,
+      side: THREE.DoubleSide
+    });
+
+    function buildFan() {
+      while (fanGroup.children.length > 0) {
+        const obj = fanGroup.children[0];
+        fanGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+      }
+      blades = [];
+
+      radius = Math.sqrt((vp.width / 2) ** 2 + (vp.height / 2) ** 2) * 1.1;
+
+      for (let i = 0; i < numBlades; i++) {
+        const startAngle = i * anglePerBlade;
+        const endAngle = (i + 1) * anglePerBlade;
+
+        const p0 = new THREE.Vector3(0, 0, 0);
+        const p1 = new THREE.Vector3(Math.cos(startAngle) * radius, Math.sin(startAngle) * radius, 0);
+        const p2 = new THREE.Vector3(Math.cos(endAngle) * radius, Math.sin(endAngle) * radius, 0);
+
+        const geom = new THREE.BufferGeometry();
+        const positions = new Float32Array([
+          p0.x, p0.y, p0.z,
+          p1.x, p1.y, p1.z,
+          p2.x, p2.y, p2.z
+        ]);
+
+        const toUv = (pt) => [
+          (pt.x + vp.width / 2) / vp.width,
+          (pt.y + vp.height / 2) / vp.height
+        ];
+
+        const uv0 = toUv(p0);
+        const uv1 = toUv(p1);
+        const uv2 = toUv(p2);
+
+        const uvs = new Float32Array([
+          uv0[0], uv0[1],
+          uv1[0], uv1[1],
+          uv2[0], uv2[1]
+        ]);
+
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+        const mesh = new THREE.Mesh(geom, fanMat);
+        mesh.scale.set(0, 0, 0);
+        mesh.rotation.z = 0;
+        fanGroup.add(mesh);
+
+        blades.push({ mesh, index: i, startAngle });
+      }
+    }
+
+    buildFan();
+
+    // 5. Transição com GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      fanMat.map = textures[nextIndex];
+      fanMat.needsUpdate = true;
+
+      blades.forEach(b => {
+        b.mesh.scale.set(0, 0, 0);
+        b.mesh.rotation.y = Math.PI / 2;
+        b.mesh.position.z = 0.5;
+      });
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          bgMat.map = textures[nextIndex];
+          bgMat.needsUpdate = true;
+          blades.forEach(b => {
+            b.mesh.scale.set(0, 0, 0);
+          });
+          currentIndex = nextIndex;
+          isAnimating = false;
+        }
+      });
+
+      blades.forEach(b => {
+        const delay = (b.index / numBlades) * 0.7;
+
+        tl.to(b.mesh.scale, {
+          x: 1,
+          y: 1,
+          z: 1,
+          duration: 0.8,
+          ease: "power2.out"
+        }, delay);
+
+        tl.to(b.mesh.rotation, {
+          y: 0,
+          duration: 0.8,
+          ease: "back.out(1.2)"
+        }, delay);
+
+        tl.to(b.mesh.position, {
+          z: 0.0,
+          duration: 0.8,
+          ease: "power2.inOut"
+        }, delay);
+      });
+    }
+
+    // 6. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+
+      bgMesh.geometry.dispose();
+      bgMesh.geometry = new THREE.PlaneGeometry(vp.width, vp.height);
+
+      buildFan();
+    });
+
+    // 7. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (bgMesh.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      bgMat.map = textures[0];
+      bgMat.needsUpdate = true;
+      bgMesh.visible = true;
+
+      fanMat.map = textures[1] || textures[0];
+      fanMat.needsUpdate = true;
+      fanGroup.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estrelas Amarelas Pulsando 3D - CHAT-DF</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+html, body {
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      overflow: hidden;
+    }
+    #webgl-container {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="webgl-container"></div>
+
+  <script>
+    // 1. CENA, CÂMERA E RENDERER
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('webgl-container').appendChild(renderer.domElement);
+
+    // TEXTURA 1: Poeira de estrelas redondas
+    function createDustTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32; canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, 'rgba(255, 235, 170, 1)');
+      grad.addColorStop(0.4, 'rgba(255, 200, 100, 0.5)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 32, 32);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // TEXTURA 2: Estrela de 4 pontas brilhante (Dourada/Amarela)
+    function createYellowStarTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const cx = 64, cy = 64;
+
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 50);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.2, 'rgba(255, 220, 120, 0.85)');
+      grad.addColorStop(0.6, 'rgba(255, 180, 50, 0.3)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+
+      ctx.fillStyle = 'rgba(255, 250, 220, 0.95)';
+      
+      // Raio vertical
+      ctx.beginPath();
+      ctx.moveTo(cx, 4);
+      ctx.quadraticCurveTo(cx, cy, cx + 4, cy);
+      ctx.quadraticCurveTo(cx, cy, cx, 124);
+      ctx.quadraticCurveTo(cx, cy, cx - 4, cy);
+      ctx.quadraticCurveTo(cx, cy, cx, 4);
+      ctx.fill();
+
+      // Raio horizontal
+      ctx.beginPath();
+      ctx.moveTo(4, cy);
+      ctx.quadraticCurveTo(cx, cy, cx, cy - 4);
+      ctx.quadraticCurveTo(cx, cy, 124, cy);
+      ctx.quadraticCurveTo(cx, cy, cx, cy + 4);
+      ctx.quadraticCurveTo(cx, cy, 4, cy);
+      ctx.fill();
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const dustTexture = createDustTexture();
+    const yellowStarTexture = createYellowStarTexture();
+
+    // 2. CAMPO DE POEIRA ESTELAR AUMENTADO (2500 pontos)
+    const dustCount = 2500;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(dustCount * 3);
+
+    for (let i = 0; i < dustCount * 3; i += 3) {
+      dustPos[i] = (Math.random() - 0.5) * 180;
+      dustPos[i + 1] = (Math.random() - 0.5) * 140;
+      dustPos[i + 2] = (Math.random() - 0.5) * 100;
+    }
+
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    const dustMat = new THREE.PointsMaterial({
+      map: dustTexture,
+      size: 0.9,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const dustField = new THREE.Points(dustGeo, dustMat);
+    scene.add(dustField);
+
+    // 3. ESTRELAS AMARELAS AUMENTADAS (160 estrelas principais de 4 pontas)
+    const starCount = 160;
+    const starGroup = new THREE.Group();
+    const starsData = [];
+
+    for (let i = 0; i < starCount; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: yellowStarTexture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(mat);
+      
+      const posX = (Math.random() - 0.5) * 120;
+      const posY = (Math.random() - 0.5) * 100;
+      const posZ = (Math.random() - 0.5) * 70;
+      const baseScale = 2.0 + Math.random() * 4.5;
+
+      sprite.position.set(posX, posY, posZ);
+      sprite.scale.set(baseScale, baseScale, 1);
+
+      starGroup.add(sprite);
+
+      starsData.push({
+        sprite: sprite,
+        baseScale: baseScale,
+        pulseSpeed: 1 + Math.random() * 3.5,
+        offset: Math.random() * Math.PI * 2
+      });
+    }
+
+    scene.add(starGroup);
+
+    // 4. RESPONSIVIDADE DEDICADA PARA MOBILE E DESKTOP
+    function updateLayout() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const aspect = width / height;
+
+      camera.aspect = aspect;
+
+      // Se for celular/mobile (orientação vertical)
+      if (aspect < 1) {
+        camera.position.z = 65; // Afasta mais a câmera para preencher a tela inteira sem cortar
+      } else {
+        camera.position.z = 40; // Visão padrão para monitores
+      }
+
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener('resize', updateLayout);
+    updateLayout();
+
+    // 5. ANIMAÇÃO DE PULSAÇÃO E ROTAÇÃO
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = clock.getElapsedTime();
+
+      // Rotação suave do campo 3D
+      starGroup.rotation.y = Math.sin(time * 0.1) * 0.08;
+      starGroup.rotation.x = Math.cos(time * 0.08) * 0.05;
+      dustField.rotation.y = time * 0.005;
+
+      // Animação individual de pulso
+      starsData.forEach(s => {
+        const pulse = Math.sin(time * s.pulseSpeed + s.offset);
+        const scaleFactor = 1 + pulse * 0.4; // Pulsa até 40% do tamanho
+        
+        s.sprite.scale.set(
+          s.baseScale * scaleFactor,
+          s.baseScale * scaleFactor,
+          1
+        );
+        s.sprite.material.opacity = 0.6 + (pulse + 1) * 0.2;
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

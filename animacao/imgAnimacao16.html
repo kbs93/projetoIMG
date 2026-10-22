@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Colmeia Hexagonal 3D - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões exatas do campo de visão total
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // 4. Montagem da Malha Hexagonal 3D
+    const hexGroup = new THREE.Group();
+    hexGroup.visible = false;
+    scene.add(hexGroup);
+
+    let hexMeshes = [];
+    const matHex = new THREE.MeshBasicMaterial({
+      map: null,
+      side: THREE.DoubleSide
+    });
+
+    function createHexGeometry(radius, centerX, centerY, totalWidth, totalHeight) {
+      const geom = new THREE.BufferGeometry();
+      const positions = [];
+      const uvs = [];
+
+      const cU = (centerX + totalWidth / 2) / totalWidth;
+      const cV = (centerY + totalHeight / 2) / totalHeight;
+
+      for (let i = 0; i < 6; i++) {
+        const a1 = (Math.PI / 3) * i;
+        const a2 = (Math.PI / 3) * (i + 1);
+
+        const x1 = centerX + Math.cos(a1) * radius;
+        const y1 = centerY + Math.sin(a1) * radius;
+        const x2 = centerX + Math.cos(a2) * radius;
+        const y2 = centerY + Math.sin(a2) * radius;
+
+        positions.push(centerX, centerY, 0);
+        positions.push(x1, y1, 0);
+        positions.push(x2, y2, 0);
+
+        uvs.push(cU, cV);
+        uvs.push((x1 + totalWidth / 2) / totalWidth, (y1 + totalHeight / 2) / totalHeight);
+        uvs.push((x2 + totalWidth / 2) / totalWidth, (y2 + totalHeight / 2) / totalHeight);
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      return geom;
+    }
+
+    function buildHexGrid() {
+      while (hexGroup.children.length > 0) {
+        const obj = hexGroup.children[0];
+        hexGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+      }
+      hexMeshes = [];
+
+      const hexRadius = vp.height * 0.12;
+      const hDist = hexRadius * Math.sqrt(3);
+      const vDist = hexRadius * 1.5;
+
+      const cols = Math.ceil(vp.width / hDist) + 2;
+      const rows = Math.ceil(vp.height / vDist) + 2;
+
+      for (let r = -Math.floor(rows / 2); r <= Math.floor(rows / 2); r++) {
+        for (let c = -Math.floor(cols / 2); c <= Math.floor(cols / 2); c++) {
+          const xOffset = (Math.abs(r) % 2 === 1) ? hDist / 2 : 0;
+          const posX = c * hDist + xOffset;
+          const posY = r * vDist;
+
+          const geom = createHexGeometry(hexRadius * 1.01, posX, posY, vp.width, vp.height);
+          const mesh = new THREE.Mesh(geom, matHex);
+          
+          mesh.userData = {
+            baseX: posX,
+            baseY: posY,
+            distFromCenter: Math.sqrt(posX * posX + posY * posY)
+          };
+
+          hexGroup.add(mesh);
+          hexMeshes.push(mesh);
+        }
+      }
+    }
+
+    buildHexGrid();
+
+    // 5. Transição GSAP
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      const maxDist = Math.max(...hexMeshes.map(m => m.userData.distFromCenter));
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          currentIndex = nextIndex;
+          hexMeshes.forEach(m => {
+            m.position.z = 0;
+            m.rotation.z = 0;
+            m.scale.set(1, 1, 1);
+          });
+          isAnimating = false;
+        }
+      });
+
+      hexMeshes.forEach(mesh => {
+        const delay = (mesh.userData.distFromCenter / maxDist) * 0.6;
+
+        tl.to(mesh.position, {
+          z: 1.4,
+          duration: 0.65,
+          ease: "power2.out"
+        }, delay);
+
+        tl.to(mesh.scale, {
+          x: 0.88,
+          y: 0.88,
+          duration: 0.65,
+          ease: "power2.out"
+        }, delay);
+
+        tl.to(mesh.rotation, {
+          z: Math.PI / 3,
+          duration: 0.65,
+          ease: "power2.out"
+        }, delay);
+
+        tl.add(() => {
+          matHex.map = textures[nextIndex];
+          matHex.needsUpdate = true;
+        }, 0.7);
+
+        tl.to(mesh.position, {
+          z: 0.0,
+          duration: 0.75,
+          ease: "back.out(1.4)"
+        }, delay + 0.7);
+
+        tl.to(mesh.scale, {
+          x: 1.0,
+          y: 1.0,
+          duration: 0.75,
+          ease: "power2.inOut"
+        }, delay + 0.7);
+
+        tl.to(mesh.rotation, {
+          z: 0.0,
+          duration: 0.75,
+          ease: "power2.inOut"
+        }, delay + 0.7);
+      });
+    }
+
+    // 6. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+      buildHexGrid();
+    });
+
+    // 7. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (hexGroup.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      matHex.map = textures[0];
+      matHex.needsUpdate = true;
+      hexGroup.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

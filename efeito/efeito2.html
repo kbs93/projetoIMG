@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Túnel Estrela Neon 3D</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+body {
+      width: 100vw;
+      height: 100vh;
+      background-color: transparent;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="neonTunnel"></canvas>
+
+  <script>
+    const canvas = document.getElementById('neonTunnel');
+    const ctx = canvas.getContext('2d');
+
+    let width, height, centerX, centerY;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      centerX = width / 2;
+      centerY = height / 2 - 40; // Leve deslocamento para dar sensação de chão
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Configurações do Túnel
+    const totalStars = 18;
+    const speed = 4;
+    let stars = [];
+
+    // Função para desenhar o caminho de uma estrela de 5 pontas
+    function drawStarPath(ctx, x, y, radius, innerRadius) {
+      const points = 5;
+      const step = Math.PI / points;
+
+      ctx.beginPath();
+      for (let i = 0; i < 2 * points; i++) {
+        const r = (i % 2 === 0) ? radius : innerRadius;
+        const angle = i * step - Math.PI / 2;
+        const currX = x + r * Math.cos(angle);
+        const currY = y + r * Math.sin(angle);
+
+        if (i === 0) ctx.moveTo(currX, currY);
+        else ctx.lineTo(currX, currY);
+      }
+      ctx.closePath();
+    }
+
+    // Inicialização das Estrelas Neon
+    for (let i = 0; i < totalStars; i++) {
+      stars.push({
+        z: i * 150,
+        colorType: i % 2 === 0 ? 'pink' : 'cyan'
+      });
+    }
+
+    // Configuração das Partículas de Luz em volta
+    const totalParticles = 60;
+    let particles = [];
+
+    for (let i = 0; i < totalParticles; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 200 + Math.random() * 400;
+      particles.push({
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        z: Math.random() * 2500,
+        length: 30 + Math.random() * 50,
+        color: Math.random() > 0.5 ? '#ff007f' : '#00f0ff'
+      });
+    }
+
+    // Offset de movimento para as setas do chão
+    let floorOffset = 0;
+
+   function animate() {
+      // Limpa a tela com transparência para a imagem aparecer por trás
+      ctx.clearRect(0, 0, width, height);
+
+      // --- 1. PARTICULAS DE LUZ NAS LATERAIS ---
+      particles.forEach(p => {
+        p.z -= speed * 2;
+        if (p.z <= 1) p.z += 2500;
+
+        const scale = 400 / p.z;
+        const px = centerX + p.x * scale;
+        const py = centerY + p.y * scale;
+
+        const scaleNext = 400 / (p.z + p.length);
+        const pxNext = centerX + p.x * scaleNext;
+        const pyNext = centerY + p.y * scaleNext;
+
+        if (px > 0 && px < width && py > 0 && py < height) {
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(pxNext, pyNext);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = Math.max(1, 3 * scale);
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = p.color;
+          ctx.stroke();
+        }
+      });
+
+      // --- 2. TÚNEL DE ESTRELAS 3D ---
+      // Ordenamos para desenhar do fundo para a frente
+      stars.sort((a, b) => b.z - a.z);
+
+      stars.forEach(star => {
+        star.z -= speed;
+        if (star.z <= 10) star.z += totalStars * 150;
+
+        const scale = 350 / star.z;
+        const outerRadius = 380 * scale;
+        const innerRadius = 180 * scale;
+
+        if (outerRadius > 2) {
+          const mainColor = star.colorType === 'pink' ? '#ff00bb' : '#00f0ff';
+          const glowColor = star.colorType === 'pink' ? '#ff0055' : '#00aaff';
+
+          drawStarPath(ctx, centerX, centerY, outerRadius, innerRadius);
+
+          // Efeito Neon Brilhante
+          ctx.strokeStyle = mainColor;
+          ctx.lineWidth = Math.max(2, 6 * scale);
+          ctx.shadowBlur = Math.min(25, 20 * scale);
+          ctx.shadowColor = glowColor;
+          ctx.stroke();
+
+          // Segunda camada interna de luz branca para o centro do neon
+          ctx.lineWidth = Math.max(1, 2 * scale);
+          ctx.strokeStyle = '#ffffff';
+          ctx.shadowBlur = 0;
+          ctx.stroke();
+        }
+      });
+
+      // --- 3. SETAS ILUMINADAS NO CHÃO ---
+      floorOffset += speed * 0.8;
+      if (floorOffset > 80) floorOffset = 0;
+
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#00f0ff';
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = 3;
+
+      for (let i = 0; i < 8; i++) {
+        const arrowZ = (i * 80 + floorOffset);
+        const scale = 250 / (600 - arrowZ);
+        if (scale > 0 && scale < 3) {
+          const arrowY = centerY + 180 * scale;
+          const arrowWidth = 30 * scale;
+          const arrowHeight = 15 * scale;
+
+          ctx.beginPath();
+          ctx.moveTo(centerX - arrowWidth, arrowY + arrowHeight);
+          ctx.lineTo(centerX, arrowY);
+          ctx.lineTo(centerX + arrowWidth, arrowY + arrowHeight);
+          ctx.stroke();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

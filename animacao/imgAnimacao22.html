@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carrossel 3D Cinemático - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #050508;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const cameraDistance = 5.0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, cameraDistance);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Dimensões do plano focal da câmara
+    function getViewportSize(depth, cam) {
+      const vFov = (cam.fov * Math.PI) / 180;
+      const height = 2 * Math.tan(vFov / 2) * depth;
+      const width = height * cam.aspect;
+      return { width, height };
+    }
+
+    let vp = getViewportSize(cameraDistance, camera);
+
+    // 4. Montagem do Carrossel 3D
+    const carouselGroup = new THREE.Group();
+    carouselGroup.visible = false;
+    scene.add(carouselGroup);
+
+    let panels = [];
+    let panelGeom = new THREE.PlaneGeometry(vp.width, vp.height);
+
+    function createPanels() {
+      while (carouselGroup.children.length > 0) {
+        const obj = carouselGroup.children[0];
+        carouselGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+      }
+      panels = [];
+      if (!textures.length) return;
+
+      panelGeom = new THREE.PlaneGeometry(vp.width, vp.height);
+
+      for (let i = 0; i < textures.length; i++) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: textures[i],
+          transparent: true,
+          side: THREE.DoubleSide
+        });
+
+        const mesh = new THREE.Mesh(panelGeom, mat);
+        carouselGroup.add(mesh);
+
+        panels.push({
+          mesh,
+          mat,
+          index: i
+        });
+      }
+      updateLayout(currentIndex, false);
+    }
+
+    // 5. Posicionamento Cinemático dos Painéis com Curvatura Focal
+    function updateLayout(activeOffset, animate = true) {
+      if (!panels.length) return;
+      const totalSlides = panels.length;
+      const spacingX = vp.width * 0.95;
+      const depthZ = 2.4;
+      const rotYAngle = 0.35;
+
+      panels.forEach((p) => {
+        let diff = (p.index - activeOffset) % totalSlides;
+        if (diff > totalSlides / 2) diff -= totalSlides;
+        if (diff < -totalSlides / 2) diff += totalSlides;
+
+        const targetX = diff * spacingX;
+        const targetZ = -Math.abs(diff) * depthZ;
+        const targetRotY = -Math.sign(diff) * Math.min(Math.abs(diff), 1.0) * rotYAngle;
+        const targetScale = Math.max(1.0 - Math.abs(diff) * 0.22, 0.65);
+        const targetOpacity = Math.max(1.0 - Math.abs(diff) * 0.45, 0.15);
+
+        if (animate) {
+          gsap.to(p.mesh.position, {
+            x: targetX,
+            z: targetZ,
+            duration: 1.25,
+            ease: "power3.out"
+          });
+          gsap.to(p.mesh.rotation, {
+            y: targetRotY,
+            duration: 1.25,
+            ease: "power3.out"
+          });
+          gsap.to(p.mesh.scale, {
+            x: targetScale,
+            y: targetScale,
+            duration: 1.25,
+            ease: "power3.out"
+          });
+          gsap.to(p.mat, {
+            opacity: targetOpacity,
+            duration: 1.25,
+            ease: "power2.out"
+          });
+        } else {
+          p.mesh.position.set(targetX, 0, targetZ);
+          p.mesh.rotation.set(0, targetRotY, 0);
+          p.mesh.scale.set(targetScale, targetScale, 1);
+          p.mat.opacity = targetOpacity;
+        }
+
+        p.mesh.renderOrder = 100 - Math.round(Math.abs(diff) * 10);
+      });
+    }
+
+    // 6. Transição Automática
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      currentIndex = (currentIndex + 1) % textures.length;
+      updateLayout(currentIndex, true);
+
+      gsap.to(camera.position, {
+        z: cameraDistance + 0.5,
+        duration: 0.6,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1,
+        onComplete: () => {
+          isAnimating = false;
+        }
+      });
+    }
+
+    // 7. Parallax Suave com o Movimento do Mouse
+    let targetCameraX = 0;
+    let targetCameraY = 0;
+
+    window.addEventListener('mousemove', (e) => {
+      const mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      const mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+      targetCameraX = mouseX * 0.35;
+      targetCameraY = mouseY * 0.2;
+    });
+
+    // 8. Redimensionamento Responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      vp = getViewportSize(cameraDistance, camera);
+      createPanels();
+    });
+
+    // 9. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+
+      camera.position.x += (targetCameraX - camera.position.x) * 0.05;
+      camera.position.y += (targetCameraY - camera.position.y) * 0.05;
+      camera.lookAt(0, 0, 0);
+
+      if (carouselGroup.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      createPanels();
+      carouselGroup.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>

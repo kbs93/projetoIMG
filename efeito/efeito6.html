@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Rastros Elegantes 3D - CHAT-DF</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #0a0300 0%, #010000 100%);
+      overflow: hidden;
+    }
+
+    #webgl-container {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="webgl-container"></div>
+
+  <script>
+    // 1. CENA, CÂMERA E RENDERER 3D
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('webgl-container').appendChild(renderer.domElement);
+
+    // FUNÇÃO PARA GERAR TEXTURA DE BRILHO SUAVE (Sem cantos duros)
+    function createGlowFlareTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.2, 'rgba(255, 170, 0, 0.9)');
+      grad.addColorStop(0.5, 'rgba(255, 60, 0, 0.4)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const glowTexture = createGlowFlareTexture();
+
+    // 2. TUBOS DE LUZ 3D ELEGANTES (Curvas orgânicas volumétricas)
+    const totalTubes = 28;
+    const tubesGroup = new THREE.Group();
+    const tubesData = [];
+
+    const colors = [0xffcc00, 0xff7700, 0xff3300, 0xee2200];
+
+    for (let i = 0; i < totalTubes; i++) {
+      const points = [];
+      const numPoints = 7;
+      const radius = 8 + Math.random() * 14;
+      const startAngle = (Math.PI * 2 / totalTubes) * i;
+
+      for (let j = 0; j < numPoints; j++) {
+        const angle = startAngle + (j / numPoints) * Math.PI * 1.5;
+        const r = radius + Math.sin(j * 0.8) * 5;
+        points.push(new THREE.Vector3(
+          Math.cos(angle) * r,
+          Math.sin(angle) * r,
+          (Math.random() - 0.5) * 16
+        ));
+      }
+
+      // Curva matemática suave
+      const curve = new THREE.CatmullRomCurve3(points);
+      
+      // Cria a geometria do tubo cilíndrico suave em 3D
+      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.08 + Math.random() * 0.12, 8, false);
+      
+      const tubeMat = new THREE.MeshBasicMaterial({
+        color: colors[i % colors.length],
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        wireframe: false
+      });
+
+      const mesh = new THREE.Mesh(tubeGeo, tubeMat);
+      tubesGroup.add(mesh);
+
+      tubesData.push({
+        mesh: mesh,
+        rotSpeedX: (Math.random() - 0.5) * 0.003,
+        rotSpeedY: (Math.random() - 0.5) * 0.004,
+        rotSpeedZ: (Math.random() - 0.5) * 0.002
+      });
+    }
+
+    scene.add(tubesGroup);
+
+    // 3. NÚCLEO E POEIRA DE FAÍSCAS CENTRALIZADAS (Efeito Flare/Incandescente)
+    const totalSparks = 60;
+    const sparksGroup = new THREE.Group();
+    const sparksData = [];
+
+    for (let i = 0; i < totalSparks; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: glowTexture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(mat);
+
+      // Posição concentrada no centro com dispersão sutil
+      const posX = (Math.random() - 0.5) * 18;
+      const posY = (Math.random() - 0.5) * 14;
+      const posZ = (Math.random() - 0.5) * 12;
+      const baseScale = 1.5 + Math.random() * 4.0;
+
+      sprite.position.set(posX, posY, posZ);
+      sprite.scale.set(baseScale, baseScale, 1);
+
+      sparksGroup.add(sprite);
+
+      sparksData.push({
+        sprite: sprite,
+        baseScale: baseScale,
+        pulseSpeed: 1 + Math.random() * 2.5,
+        offset: Math.random() * Math.PI * 2
+      });
+    }
+
+    scene.add(sparksGroup);
+
+    // 4. RESPONSIVIDADE DEDICADA MOBILE
+    function updateLayout() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const aspect = width / height;
+
+      camera.aspect = aspect;
+
+      if (aspect < 1) { // Mobile
+        camera.position.z = 40;
+      } else { // Desktop
+        camera.position.z = 28;
+      }
+
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener('resize', updateLayout);
+    updateLayout();
+
+    // 5. ANIMAÇÃO DE ROTAÇÃO E PULSAÇÃO CONTINUA
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = clock.getElapsedTime();
+
+      // Movimento orbital suave dos tubos de luz
+      tubesData.forEach(t => {
+        t.mesh.rotation.x += t.rotSpeedX;
+        t.mesh.rotation.y += t.rotSpeedY;
+        t.mesh.rotation.z += t.rotSpeedZ;
+      });
+
+      // Pulsação das faíscas centrais
+      sparksData.forEach(s => {
+        const pulse = Math.sin(time * s.pulseSpeed + s.offset);
+        const scaleFactor = 1 + pulse * 0.25;
+
+        s.sprite.scale.set(
+          s.baseScale * scaleFactor,
+          s.baseScale * scaleFactor,
+          1
+        );
+
+        s.sprite.material.opacity = 0.6 + (pulse + 1) * 0.2;
+      });
+
+      // Rotação suave e elegante do grupo 3D completo
+      tubesGroup.rotation.z = time * 0.015;
+      tubesGroup.rotation.y = Math.sin(time * 0.05) * 0.15;
+      sparksGroup.rotation.z = -time * 0.01;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partículas 3D Ecrã Inteiro - Three.js</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #image-source-list {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="image-source-list"></div>
+  <div id="webgl-canvas"></div>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    // 1. Variáveis de controlo com let
+    let textures = [];
+    let currentIndex = 0;
+    let isAnimating = false;
+    let autoPlayTimer = null;
+    const loader = new THREE.TextureLoader();
+
+    // 2. Setup Three.js com Câmara Ortográfica
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+    camera.position.z = 1;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // 3. Resolução da grelha de partículas otimizada
+    const widthSegments = 640;
+    const heightSegments = 360;
+    const totalParticles = widthSegments * heightSegments;
+
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(totalParticles * 3);
+    const uvs = new Float32Array(totalParticles * 2);
+    const randomOffsets = new Float32Array(totalParticles * 3);
+
+    let index = 0;
+    for (let y = 0; y < heightSegments; y++) {
+      for (let x = 0; x < widthSegments; x++) {
+        const u = x / (widthSegments - 1);
+        const v = 1.0 - (y / (heightSegments - 1));
+
+        positions[index * 3 + 0] = (u - 0.5) * 2.0;
+        positions[index * 3 + 1] = (v - 0.5) * 2.0;
+        positions[index * 3 + 2] = 0.0;
+
+        uvs[index * 2 + 0] = u;
+        uvs[index * 2 + 1] = v;
+
+        randomOffsets[index * 3 + 0] = (Math.random() - 0.5) * 1.2;
+        randomOffsets[index * 3 + 1] = (Math.random() - 0.5) * 1.2;
+        randomOffsets[index * 3 + 2] = (Math.random() - 0.5) * 2.0;
+
+        index++;
+      }
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setAttribute('aRandom', new THREE.BufferAttribute(randomOffsets, 3));
+
+    // 4. Vertex e Fragment Shaders
+    const vertexShader = `
+      uniform float uProgress;
+      uniform float uPointSize;
+      attribute vec3 aRandom;
+      varying vec2 vUv;
+      varying float vProgress;
+
+      void main() {
+        vUv = uv;
+        vProgress = uProgress;
+
+        vec3 pos = position;
+        float spreadFactor = sin(uProgress * 3.1415926);
+        pos += aRandom * spreadFactor;
+
+        gl_Position = vec4(pos, 1.0);
+        gl_PointSize = uPointSize * (1.0 + spreadFactor * 1.5);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D uTextureCurrent;
+      uniform sampler2D uTextureNext;
+      uniform float uProgress;
+      varying vec2 vUv;
+      varying float vProgress;
+
+      void main() {
+        float spread = sin(vProgress * 3.1415926);
+
+        if (spread > 0.05) {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+        }
+
+        vec4 colorCurrent = texture2D(uTextureCurrent, vUv);
+        vec4 colorNext = texture2D(uTextureNext, vUv);
+
+        gl_FragColor = mix(colorCurrent, colorNext, uProgress);
+      }
+    `;
+
+    // 5. Configuração dos uniforms com null seguro
+    const uniforms = {
+      uTextureCurrent: { value: null },
+      uTextureNext: { value: null },
+      uProgress: { value: 0.0 },
+      uPointSize: { value: (window.innerWidth / widthSegments) * window.devicePixelRatio * 1.25 }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms,
+      transparent: true,
+      depthTest: false
+    });
+
+    const points = new THREE.Points(geometry, material);
+    points.visible = false;
+    scene.add(points);
+
+    // 6. Transição
+    function nextSlide() {
+      if (isAnimating || !textures.length || textures.length < 2) return;
+      isAnimating = true;
+
+      const nextIndex = (currentIndex + 1) % textures.length;
+      uniforms.uTextureCurrent.value = textures[currentIndex];
+      uniforms.uTextureNext.value = textures[nextIndex];
+      uniforms.uProgress.value = 0.0;
+
+      gsap.to(uniforms.uProgress, {
+        value: 1.0,
+        duration: 2.2,
+        ease: "power2.inOut",
+        onComplete: () => {
+          currentIndex = nextIndex;
+          uniforms.uTextureCurrent.value = textures[currentIndex];
+          uniforms.uProgress.value = 0.0;
+          isAnimating = false;
+        }
+      });
+    }
+
+    // 7. Redimensionamento
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      uniforms.uPointSize.value = (window.innerWidth / widthSegments) * window.devicePixelRatio * 1.25;
+    });
+
+    // 8. Loop de Renderização
+    function render() {
+      requestAnimationFrame(render);
+      if (points.visible) {
+        renderer.render(scene, camera);
+      }
+    }
+    render();
+
+    // --- PADRÃO UNIVERSAL DE RECEBIMENTO DE FOTOS ---
+    function aplicarFotos(listaFotos) {
+      if (!listaFotos || !listaFotos.length) return;
+
+      const fotosParaUsar = listaFotos.length === 1 ? [listaFotos[0], listaFotos[0]] : listaFotos;
+
+      textures = fotosParaUsar.map(url => {
+        const tex = loader.load(url);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        return tex;
+      });
+
+      currentIndex = 0;
+      isAnimating = false;
+
+      if (uniforms.uTextureCurrent) uniforms.uTextureCurrent.value = textures[0];
+      if (uniforms.uTextureNext) uniforms.uTextureNext.value = textures[1] || textures[0];
+      uniforms.uProgress.value = 0.0;
+      points.visible = true;
+
+      clearInterval(autoPlayTimer);
+      if (textures.length > 1) {
+        autoPlayTimer = setInterval(nextSlide, 3500);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.tipo === 'CARREGAR_FOTOS') {
+        aplicarFotos(event.data.fotos);
+      }
+    });
+
+    window.atualizarTexturas = function(novosLinks) {
+      aplicarFotos(novosLinks);
+    };
+
+    window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
+  </script>
+</body>
+</html>
