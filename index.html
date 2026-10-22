@@ -54,20 +54,52 @@
       
       <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
     <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
-      <div class="sidebar-media" aria-label="Galeria de Imagens">
-        <div class="sidebar-header">
-          <h2>Imagens (<span id="imgCount">0</span>/6)</h2>
-          <label for="fileInput" class="btn-add-photos">+ Adicionar ate 6 fotos</label>
-          <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+  <!-- OVERLAY DE FUNDO PARA O PAINEL DESLIZANTE DA ESQUERDA -->
+      <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
+
+      <!-- SIDEBAR / PAINEL DESLIZANTE DA ESQUERDA -->
+      <div class="sidebar-media" id="sidebarMedia" aria-label="Galeria e Textos">
+        
+        <!-- Cabeçalho visível no Mobile com botão de fechar -->
+        <div class="sidebar-mobile-bar">
+          <span id="sidebarMobileTitle">Gerenciador</span>
+          <button id="btnCloseSidebar" class="btn-close-sidebar" type="button" aria-label="Fechar painel">&times;</button>
         </div>
-        <div id="mediaGrid" class="media-grid"></div>
+
+        <!-- Seção 1: Imagens -->
+        <div class="sidebar-panel-section" id="sectionImages">
+          <div class="sidebar-header">
+            <h2>Imagens (<span id="imgCount">0</span>/6)</h2>
+            <label for="fileInput" class="btn-add-photos">+ Adicionar ate 6 fotos</label>
+            <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+          </div>
+          <div id="mediaGrid" class="media-grid"></div>
+        </div>
+
+        <!-- Seção 2: Accordion de Texto Desktop -->
+        <button id="btnToggleText" class="btn-add-text-accordion" type="button">
+          adicionar <strong>TEXTO</strong>
+          <span class="accordion-arrow">▾</span>
+        </button>
+
+        <!-- Painel dos Modelos de Texto (Mostra 4 e rola o resto) -->
+        <div id="textAccordion" class="text-accordion-panel">
+          <span class="text-accordion-title">Modelos de Texto</span>
+          <div id="textItemsGrid" class="text-presets-grid"></div>
+        </div>
       </div>
 
-
       <!-- SEÇÃO DO PALCO / PLAYER 3D -->
+    <!-- SEÇÃO DO PALCO / PLAYER 3D -->
       <section class="stage-section" aria-label="Palco de Visualização 3D">
         
-        <!-- Toolbar Superior do Player: Seletor de Tamanho / Proporções -->
+        <!-- 1. BARRA EXCLUSIVA MOBILE: BOTÕES LIMPOS (IMAGEM 2) -->
+        <div class="mobile-top-bar">
+          <button id="btnMobileAddImg" class="btn-mobile-action" type="button">add Imagem</button>
+          <button id="btnMobileAddTxt" class="btn-mobile-action" type="button">Add Texto</button>
+        </div>
+
+        <!-- 2. BARRA DE PROPORÇÕES CENTRALIZADA LOGO ABAIXO -->
         <div class="stage-toolbar">
           <div class="ratio-dropdown-container">
             <button id="btnRatioSelect" class="btn-ratio-trigger" type="button" aria-haspopup="true" aria-expanded="false">

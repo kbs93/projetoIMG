@@ -1,9 +1,13 @@
 import { MediaManager } from './media.js';
 import { Recorder } from './recorde.js';
 import { OverlaysManager } from './efeito.js';
+import { TextEditor } from './txt.js';
 
-// Inicializa os botões dinâmicos e o iframe transparente
+// 1. Inicializa os módulos específicos de funcionalidade
+const textEditor = new TextEditor();
 const overlays = new OverlaysManager();
+
+
 window.addEventListener('DOMContentLoaded', () => {
   const animFrame = document.getElementById('animFrame');
   const effectsTrack = document.getElementById('effectsTrack');
@@ -183,6 +187,81 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+
+// GERENCIAMENTO DE PAINÉIS, GAVETA MOBILE E ACCORDION
+  const sidebarMedia = document.getElementById('sidebarMedia');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const btnCloseSidebar = document.getElementById('btnCloseSidebar');
+  const sidebarMobileTitle = document.getElementById('sidebarMobileTitle');
+  const sectionImages = document.getElementById('sectionImages');
+  const btnToggleText = document.getElementById('btnToggleText');
+  const textAccordion = document.getElementById('textAccordion');
+
+  const btnMobileAddImg = document.getElementById('btnMobileAddImg');
+  const btnMobileAddTxt = document.getElementById('btnMobileAddTxt');
+
+  // Accordion no Desktop
+  if (btnToggleText && textAccordion) {
+    btnToggleText.addEventListener('click', () => {
+      const isOpen = textAccordion.classList.toggle('open');
+      btnToggleText.classList.toggle('active', isOpen);
+    });
+  }
+
+  // Abertura Mobile da Esquerda para a Direita
+  const openMobilePanel = (mode) => {
+    if (!sidebarMedia || !sidebarOverlay) return;
+
+    if (mode === 'imagens') {
+      if (sidebarMobileTitle) sidebarMobileTitle.innerText = 'Imagens';
+      if (sectionImages) sectionImages.style.display = 'block';
+      if (btnToggleText) btnToggleText.style.display = 'none';
+      if (textAccordion) textAccordion.classList.remove('open');
+    } else if (mode === 'texto') {
+      if (sidebarMobileTitle) sidebarMobileTitle.innerText = 'Modelos de Texto';
+      if (sectionImages) sectionImages.style.display = 'none';
+      if (btnToggleText) btnToggleText.style.display = 'none';
+      if (textAccordion) {
+        textAccordion.classList.add('open');
+        textAccordion.style.maxHeight = 'none';
+      }
+    }
+
+    sidebarMedia.classList.add('open-drawer');
+    sidebarOverlay.classList.add('active');
+  };
+
+  const closeMobilePanel = () => {
+    if (!sidebarMedia || !sidebarOverlay) return;
+    sidebarMedia.classList.remove('open-drawer');
+    sidebarOverlay.classList.remove('active');
+
+    // Restaura layout padrão do desktop
+    if (sectionImages) sectionImages.style.display = 'block';
+    if (btnToggleText) btnToggleText.style.display = 'flex';
+    if (textAccordion) {
+      textAccordion.classList.remove('open');
+      textAccordion.style.maxHeight = '';
+    }
+  };
+
+  if (btnMobileAddImg) {
+    btnMobileAddImg.addEventListener('click', () => openMobilePanel('imagens'));
+  }
+
+  if (btnMobileAddTxt) {
+    btnMobileAddTxt.addEventListener('click', () => openMobilePanel('texto'));
+  }
+
+  if (btnCloseSidebar) {
+    btnCloseSidebar.addEventListener('click', closeMobilePanel);
+  }
+
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeMobilePanel);
+  }
+
 });
 
 
