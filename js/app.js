@@ -1,6 +1,6 @@
 import { MediaManager } from './media.js';
 import { Recorder } from './recorde.js';
-import { OverlaysManager } from '../efeito.js';
+import { OverlaysManager } from './efeito.js';
 
 // Inicializa os botões dinâmicos e o iframe transparente
 const overlays = new OverlaysManager();
@@ -85,6 +85,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // 3. Montagem dos 24 botões na barra inferior
+  // aqui tambem adiciona as novas animacao  so colocar o "Nome da Sua Nova Animação"
   const effectNames = [
     "Ondas 2D", "Partículas", "Vidro Voronoi", "Simplex Morph", "Lente Esférica",
     "Persianas", "Twist Hiper", "Laser Cyber", "Page Curl", "Monolito 3D",
@@ -92,7 +93,7 @@ window.addEventListener('DOMContentLoaded', () => {
     "Colmeia Hex", "Blocos Queda", "Isométrico Concreto", "Vórtice Partículas", "Topográfico Z",
     "Voronoi 3D", "Carrossel Ring", "Túnel Estelar", "Caleidoscópio 3D"
   ];
-
+//nao esquecer de mudar aquitambem o 24
   for (let i = 1; i <= 24; i++) {
     const btn = document.createElement('button');
     btn.type = 'button';
