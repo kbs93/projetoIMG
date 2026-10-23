@@ -3,20 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Motion Canvas 3D</title>
+  <title>Motion Canvas 3D - Ambiente de Edição</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app-layout">
     
- 
-
     <!-- CORPO DA APLICAÇÃO (DIV) -->
     <div class="main-content">
       
-      <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
-    <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
-  <!-- OVERLAY DE FUNDO PARA O PAINEL DESLIZANTE DA ESQUERDA -->
+      <!-- OVERLAY DE FUNDO PARA O PAINEL DESLIZANTE DA ESQUERDA -->
       <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
 
       <!-- SIDEBAR / PAINEL DESLIZANTE DA ESQUERDA -->
@@ -44,7 +40,7 @@
           <span class="accordion-arrow">▾</span>
         </button>
 
-        <!-- Painel dos Modelos de Texto (Mostra 4 e rola o resto) -->
+        <!-- Painel dos Modelos de Texto -->
         <div id="textAccordion" class="text-accordion-panel">
           <span class="text-accordion-title">Modelos de Texto</span>
           <div id="textItemsGrid" class="text-presets-grid"></div>
@@ -52,16 +48,15 @@
       </div>
 
       <!-- SEÇÃO DO PALCO / PLAYER 3D -->
-    <!-- SEÇÃO DO PALCO / PLAYER 3D -->
       <section class="stage-section" aria-label="Palco de Visualização 3D">
         
-        <!-- 1. BARRA EXCLUSIVA MOBILE: BOTÕES LIMPOS (IMAGEM 2) -->
+        <!-- 1. BARRA EXCLUSIVA MOBILE -->
         <div class="mobile-top-bar">
           <button id="btnMobileAddImg" class="btn-mobile-action" type="button">add Imagem</button>
           <button id="btnMobileAddTxt" class="btn-mobile-action" type="button">Add Texto</button>
         </div>
 
-        <!-- 2. BARRA DE PROPORÇÕES CENTRALIZADA LOGO ABAIXO -->
+        <!-- 2. BARRA DE PROPORÇÕES CENTRALIZADA -->
         <div class="stage-toolbar">
           <div class="ratio-dropdown-container">
             <button id="btnRatioSelect" class="btn-ratio-trigger" type="button" aria-haspopup="true" aria-expanded="false">
@@ -138,8 +133,8 @@
           </div>
         </div>
 
-<!-- Contêiner do Vídeo e Canvas 3D -->
-       <figure id="canvasWrapper" class="canvas-wrapper">
+        <!-- Contêiner do Vídeo e Canvas 3D -->
+        <figure id="canvasWrapper" class="canvas-wrapper">
           <iframe id="animFrame" src="animacao/imgAnimacao.html" style="width: 100%; height: 100%; border: none; display: block; background: #000;"></iframe>
           <iframe id="overlayFrame" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; background: transparent; z-index: 10; display: none;"></iframe>
 
@@ -155,99 +150,94 @@
             </a>
           </div>
 
-<!-- Camada interativa para os textos no palco -->
-<div id="textOverlayContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15;"></div>
+          <!-- Camada interativa para os textos no palco -->
+          <div id="textOverlayContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15;"></div>
 
-<!-- Barra Flutuante de Edição de Texto (Estilo Canva - Completa) -->
-<div id="textFloatingToolbar" class="text-floating-toolbar" style="display: none;">
+          <!-- Barra Flutuante de Edição de Texto (Estilo Canva - Completa) -->
+          <div id="textFloatingToolbar" class="text-floating-toolbar" style="display: none;">
+            <div class="tool-divider"></div>
 
-  
-  <div class="tool-divider"></div>
+            <!-- Indicador/Seletor de Cores com balão de prévia -->
+            <div class="color-picker-wrapper" style="position: relative;">
+              <button id="toolbarColorBtn" class="tool-btn color-preview-btn" type="button" title="Cor do Texto e Fundo">
+                <span class="color-split red" id="toolbarColorFill" style="background-color:#ffffff;"></span>
+                <span class="color-split black" id="toolbarColorStroke" style="background-color: #12141a;"></span>
+              </button>
 
-  <!-- Indicador/Seletor de Cores com balão de prévia -->
-  <div class="color-picker-wrapper" style="position: relative;">
-    <button id="toolbarColorBtn" class="tool-btn color-preview-btn" type="button" title="Cor do Texto e Fundo">
-      <span class="color-split red" id="toolbarColorFill" style="background-color:#ffffff;"></span>
-      <span class="color-split black" id="toolbarColorStroke" style="background-color: #12141a;"></span>
-    </button>
+              <!-- Popup da Paleta de Cores Estilo Canva -->
+              <div id="colorPopup" class="color-picker-popup" style="display: none;">
+                <div class="color-palette-grid" id="colorPaletteGrid">
+                  <div class="color-circle" style="background: #ffffff;" data-color="#ffffff"></div>
+                  <div class="color-circle" style="background: #ff0000;" data-color="#ff0000"></div>
+                  <div class="color-circle" style="background: #ff7f00;" data-color="#ff7f00"></div>
+                  <div class="color-circle" style="background: #ffff00;" data-color="#ffff00"></div>
+                  <div class="color-circle" style="background: #7fff00;" data-color="#7fff00"></div>
+                  <div class="color-circle" style="background: #00ffff;" data-color="#00ffff"></div>
+                  <div class="color-circle" style="background: #ff00ff;" data-color="#ff00ff"></div>
+                  <div class="color-circle" style="background: #7f00ff;" data-color="#7f00ff"></div>
+                  <div class="color-circle" style="background: #000000;" data-color="#000000"></div>
+                  <div class="color-circle" style="background: #990000;" data-color="#990000"></div>
+                  <div class="color-circle" style="background: #b35900;" data-color="#b35900"></div>
+                  <div class="color-circle" style="background: #b3b300;" data-color="#b3b300"></div>
+                  <div class="color-circle" style="background: #388e3c;" data-color="#388e3c"></div>
+                  <div class="color-circle" style="background: #0088ff;" data-color="#0088ff"></div>
+                  <div class="color-circle" style="background: #9c27b0;" data-color="#9c27b0"></div>
+                  <div class="color-circle" style="background: #0d1b2a;" data-color="#0d1b2a"></div>
+                </div>
+                <div class="color-custom-row">
+                  <div class="current-color-preview" id="currentCustomPreview" style="background-color: #ffffff;"></div>
+                  <input type="text" id="colorHexInput" value="#ffffff;">
+                  <input type="range" id="colorOpacityRange" min="0" max="100" value="100" style="width: 50px;" title="Opacidade">
+                  <span id="opacityLabel" style="font-size: 10px;">100%</span>
+                </div>
+              </div>
+            </div>
 
-    <!-- Popup da Paleta de Cores Estilo Canva -->
-    <div id="colorPopup" class="color-picker-popup" style="display: none;">
-      <div class="color-palette-grid" id="colorPaletteGrid">
-        <div class="color-circle" style="background: #ffffff;" data-color="#ffffff"></div>
-        <div class="color-circle" style="background: #ff0000;" data-color="#ff0000"></div>
-        <div class="color-circle" style="background: #ff7f00;" data-color="#ff7f00"></div>
-        <div class="color-circle" style="background: #ffff00;" data-color="#ffff00"></div>
-        <div class="color-circle" style="background: #7fff00;" data-color="#7fff00"></div>
-        <div class="color-circle" style="background: #00ffff;" data-color="#00ffff"></div>
-        <div class="color-circle" style="background: #ff00ff;" data-color="#ff00ff"></div>
-        <div class="color-circle" style="background: #7f00ff;" data-color="#7f00ff"></div>
-        <div class="color-circle" style="background: #000000;" data-color="#000000"></div>
-        <div class="color-circle" style="background: #990000;" data-color="#990000"></div>
-        <div class="color-circle" style="background: #b35900;" data-color="#b35900"></div>
-        <div class="color-circle" style="background: #b3b300;" data-color="#b3b300"></div>
-        <div class="color-circle" style="background: #388e3c;" data-color="#388e3c"></div>
-        <div class="color-circle" style="background: #0088ff;" data-color="#0088ff"></div>
-        <div class="color-circle" style="background: #9c27b0;" data-color="#9c27b0"></div>
-        <div class="color-circle" style="background: #0d1b2a;" data-color="#0d1b2a"></div>
-      </div>
-      <div class="color-custom-row">
-        <div class="current-color-preview" id="currentCustomPreview" style="background-color: #ffffff;"></div>
-        <input type="text" id="colorHexInput" value="#ffffff;">
-        <input type="range" id="colorOpacityRange" min="0" max="100" value="100" style="width: 50px;" title="Opacidade">
-        <span id="opacityLabel" style="font-size: 10px;">100%</span>
-      </div>
+            <div class="tool-divider"></div>
 
-      
+            <!-- Seletor de Tamanho da Fonte -->
+            <div class="tool-select-wrapper">
+              <select id="toolbarFontSize" class="tool-select">
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+                <option value="60" selected>60</option>
+                <option value="70">70</option>
+                <option value="80">80</option>
+                <option value="90">90</option>
+                <option value="100">100</option>
+              </select>
+              <span class="tool-arrow">▾</span>
+            </div>
 
+            <div class="tool-divider"></div>
 
-    </div>
-    
-  </div>
+            <!-- Botões de Formatação -->
+            <button id="toolbarBold" class="tool-btn format-btn" type="button" title="Negrito">N</button>
+            <button id="toolbarItalic" class="tool-btn format-btn" type="button" title="Itálico">I</button>
+            <button id="toolbarUnderline" class="tool-btn format-btn" type="button" title="Sublinhado">S</button>
 
-  <div class="tool-divider"></div>
+            <div class="tool-divider"></div>
 
-  <!-- Seletor de Tamanho da Fonte -->
-  <div class="tool-select-wrapper">
-    <select id="toolbarFontSize" class="tool-select">
-      <option value="20">20</option>
-      <option value="30">30</option>
-      <option value="40">40</option>
-      <option value="50">50</option>
-      <option value="60" selected>60</option>
-      <option value="70">70</option>
-      <option value="80">80</option>
-      <option value="90">90</option>
-      <option value="100">100</option>
-    </select>
-    <span class="tool-arrow">▾</span>
-  </div>
-
-  <div class="tool-divider"></div>
-
-  <!-- Botões de Formatação -->
-  <button id="toolbarBold" class="tool-btn format-btn" type="button" title="Negrito">N</button>
-  <button id="toolbarItalic" class="tool-btn format-btn" type="button" title="Itálico">I</button>
-  <button id="toolbarUnderline" class="tool-btn format-btn" type="button" title="Sublinhado">S</button>
-
-  <div class="tool-divider"></div>
-
-  <!-- Ações -->
-
-  <button id="toolbarDelete" class="tool-btn" type="button" title="Excluir">🗑️</button>
-</div>
-          
+            <!-- Ações -->
+            <button id="toolbarDelete" class="tool-btn" type="button" title="Excluir">🗑️</button>
+          </div>
         </figure>
       </section>
 
     </div>
-<!-- BARRA DE OVERLAYS / EFEITOS POR CIMA -->
-<div class="overlays-bar" aria-label="Efeitos por cima da imagem">
+
+    <!-- BARRA DE OVERLAYS / EFEITOS POR CIMA -->
+    <div class="overlays-bar" aria-label="Efeitos por cima da imagem">
       <span class="overlays-title">Efeitos:</span>
       <div class="overlays-track" id="overlaysTrack"></div>
     </div>
 
- 
+    <!-- BARRA INFERIOR COM OS 24 EFEITOS -->
+    <footer class="footer-effects" aria-label="Seleção de Efeitos 3D">
+      <div class="effects-track" id="effectsTrack"></div>
+    </footer>
 
   </div>
 

@@ -3,13 +3,88 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Motion Canvas 3D</title>
+  <title>Motion Canvas 3D - Início</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Estilos específicos para a landing page de entrada */
+    .landing-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 20px;
+      background: radial-gradient(circle at center, #151821 0%, #0b0c10 100%);
+    }
+    .landing-hero {
+      max-width: 700px;
+      margin-bottom: 30px;
+    }
+    .landing-hero h1 {
+      font-size: 36px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 14px;
+    }
+    .landing-hero h1 span {
+      color: var(--primary-cyan);
+    }
+    .landing-hero p {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background-color: var(--primary-cyan);
+      color: #0b0c10;
+      padding: 12px 28px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(0, 210, 255, 0.4);
+    }
+    .btn-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(0, 210, 255, 0.6);
+    }
+    .institutional-sections {
+      max-width: 800px;
+      width: 100%;
+      margin-top: 50px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      text-align: left;
+    }
+    .inst-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 20px;
+      border-radius: 12px;
+    }
+    .inst-card h3 {
+      font-size: 16px;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    .inst-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
 </head>
 <body>
   <div class="app-layout">
     
-    <!-- 1. NAVBAR INSTITUCIONAL SUPERIOR -->
+    <!-- NAVBAR INSTITUCIONAL SUPERIOR -->
     <header class="topbar">
       <div class="brand">
         <span class="logo-icon">▶</span>
@@ -31,7 +106,7 @@
       </button>
     </header>
 
-    <!-- 2. MENU LATERAL DESLIZANTE (DRAWER) -->
+    <!-- MENU LATERAL DESLIZANTE (DRAWER) -->
     <div id="navOverlay" class="nav-overlay" aria-hidden="true"></div>
     <aside id="navDrawer" class="nav-drawer" aria-label="Menu Lateral">
       <div class="drawer-header">
@@ -49,251 +124,60 @@
       </nav>
     </aside>
 
-    <!-- CORPO DA APLICAÇÃO (DIV) -->
-    <div class="main-content">
-      
-      <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
-    <!-- SIDEBAR DE GERENCIAMENTO DE MÍDIA -->
-  <!-- OVERLAY DE FUNDO PARA O PAINEL DESLIZANTE DA ESQUERDA -->
-      <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
-
-      <!-- SIDEBAR / PAINEL DESLIZANTE DA ESQUERDA -->
-      <div class="sidebar-media" id="sidebarMedia" aria-label="Galeria e Textos">
-        
-        <!-- Cabeçalho visível no Mobile com botão de fechar -->
-        <div class="sidebar-mobile-bar">
-          <span id="sidebarMobileTitle">Gerenciador</span>
-          <button id="btnCloseSidebar" class="btn-close-sidebar" type="button" aria-label="Fechar painel">&times;</button>
-        </div>
-
-        <!-- Seção 1: Imagens -->
-        <div class="sidebar-panel-section" id="sectionImages">
-          <div class="sidebar-header">
-            <h2>Imagens (<span id="imgCount">0</span>/6)</h2>
-            <label for="fileInput" class="btn-add-photos">+ Adicionar ate 6 fotos</label>
-            <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
-          </div>
-          <div id="mediaGrid" class="media-grid"></div>
-        </div>
-
-        <!-- Seção 2: Accordion de Texto Desktop -->
-        <button id="btnToggleText" class="btn-add-text-accordion" type="button">
-          adicionar <strong>TEXTO</strong>
-          <span class="accordion-arrow">▾</span>
-        </button>
-
-        <!-- Painel dos Modelos de Texto (Mostra 4 e rola o resto) -->
-        <div id="textAccordion" class="text-accordion-panel">
-          <span class="text-accordion-title">Modelos de Texto</span>
-          <div id="textItemsGrid" class="text-presets-grid"></div>
-        </div>
+    <!-- CONTEÚDO DA LANDING PAGE -->
+    <main class="landing-container">
+      <div class="landing-hero">
+        <h1>Crie Animações 3D Incríveis com <span>Motion Canvas</span></h1>
+        <p>Transforme suas fotos em vídeos dinâmicos em 3D de forma rápida, profissional e direto no navegador. Sem complicações.</p>
+        <a href="ambiente.html" class="btn-cta">▶ Acessar Editor / Criar Agora</a>
       </div>
 
-      <!-- SEÇÃO DO PALCO / PLAYER 3D -->
-    <!-- SEÇÃO DO PALCO / PLAYER 3D -->
-      <section class="stage-section" aria-label="Palco de Visualização 3D">
-        
-        <!-- 1. BARRA EXCLUSIVA MOBILE: BOTÕES LIMPOS (IMAGEM 2) -->
-        <div class="mobile-top-bar">
-          <button id="btnMobileAddImg" class="btn-mobile-action" type="button">add Imagem</button>
-          <button id="btnMobileAddTxt" class="btn-mobile-action" type="button">Add Texto</button>
+      <div class="institutional-sections" id="informacoes">
+        <div class="inst-card" id="quem-somos">
+          <h3>Quem Somos</h3>
+          <p>Desenvolvedores apaixonados por criar ferramentas web de alta performance para criadores de conteúdo e designers.</p>
         </div>
-
-        <!-- 2. BARRA DE PROPORÇÕES CENTRALIZADA LOGO ABAIXO -->
-        <div class="stage-toolbar">
-          <div class="ratio-dropdown-container">
-            <button id="btnRatioSelect" class="btn-ratio-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-              <span class="ratio-icon">▢</span>
-              <span id="currentRatioLabel">Vertical 9:16</span>
-              <span class="dropdown-arrow">▾</span>
-            </button>
-
-            <!-- Dropdown Menu de Proporções -->
-            <div id="ratioMenu" class="ratio-menu" role="menu">
-              <button class="ratio-option" data-ratio="16/9" data-label="Largo 16:9" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-16-9"></span>
-                <div class="opt-info">
-                  <strong>Largo 16:9</strong>
-                  <small>YouTube e sites de streaming</small>
-                </div>
-              </button>
-
-              <button class="ratio-option active" data-ratio="9/16" data-label="Vertical 9:16" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-9-16"></span>
-                <div class="opt-info">
-                  <strong>Vertical 9:16</strong>
-                  <small>Reels do Instagram e TikTok</small>
-                </div>
-              </button>
-
-              <button class="ratio-option" data-ratio="1/1" data-label="Quadrado 1:1" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-1-1"></span>
-                <div class="opt-info">
-                  <strong>Quadrado 1:1</strong>
-                  <small>Postagens no Instagram</small>
-                </div>
-              </button>
-
-              <button class="ratio-option" data-ratio="4/3" data-label="Clássico 4:3" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-4-3"></span>
-                <div class="opt-info">
-                  <strong>Clássico 4:3</strong>
-                  <small>Formato tradicional</small>
-                </div>
-              </button>
-
-              <button class="ratio-option" data-ratio="4/5" data-label="Redes Sociais 4:5" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-4-5"></span>
-                <div class="opt-info">
-                  <strong>Redes Sociais 4:5</strong>
-                  <small>Feed vertical otimizado</small>
-                </div>
-              </button>
-
-              <button class="ratio-option" data-ratio="21/9" data-label="Cinema 21:9" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-21-9"></span>
-                <div class="opt-info">
-                  <strong>Cinema 21:9</strong>
-                  <small>Ultrawide cinematográfico</small>
-                </div>
-              </button>
-
-              <button class="ratio-option" data-ratio="2/3" data-label="Retrato 2:3" type="button" role="menuitem">
-                <span class="opt-check">✓</span>
-                <span class="opt-icon-rect rect-2-3"></span>
-                <div class="opt-info">
-                  <strong>Retrato 2:3</strong>
-                  <small>Fotografia vertical</small>
-                </div>
-              </button>
-            </div>
-          </div>
+        <div class="inst-card">
+          <h3>Informações</h3>
+          <p>Plataforma completa com mais de 24 efeitos 3D exclusivos, edição de texto estilo Canva e gravação em tempo real.</p>
         </div>
-
-<!-- Contêiner do Vídeo e Canvas 3D -->
-       <figure id="canvasWrapper" class="canvas-wrapper">
-          <iframe id="animFrame" src="animacao/imgAnimacao.html" style="width: 100%; height: 100%; border: none; display: block; background: #000;"></iframe>
-          <iframe id="overlayFrame" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; background: transparent; z-index: 10; display: none;"></iframe>
-
-          <!-- Barra Flutuante de Gravação no Player -->
-          <div class="player-controls">
-            <span id="recordTimer" class="timer-display">00:00 / 00:10</span>
-            <button id="btnRecord" class="btn-record" type="button">
-              <span class="record-dot"></span>
-              <span class="btn-text">GRAVAR 10s</span>
-            </button>
-            <a id="btnDownload" class="btn-download" style="display: none;" download="motion-canvas-3d.webm">
-              Baixar Vídeo
-            </a>
-          </div>
-
-<!-- Camada interativa para os textos no palco -->
-<div id="textOverlayContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15;"></div>
-
-<!-- Barra Flutuante de Edição de Texto (Estilo Canva - Completa) -->
-<div id="textFloatingToolbar" class="text-floating-toolbar" style="display: none;">
-
-  
-  <div class="tool-divider"></div>
-
-  <!-- Indicador/Seletor de Cores com balão de prévia -->
-  <div class="color-picker-wrapper" style="position: relative;">
-    <button id="toolbarColorBtn" class="tool-btn color-preview-btn" type="button" title="Cor do Texto e Fundo">
-      <span class="color-split red" id="toolbarColorFill" style="background-color:#ffffff;"></span>
-      <span class="color-split black" id="toolbarColorStroke" style="background-color: #12141a;"></span>
-    </button>
-
-    <!-- Popup da Paleta de Cores Estilo Canva -->
-    <div id="colorPopup" class="color-picker-popup" style="display: none;">
-      <div class="color-palette-grid" id="colorPaletteGrid">
-        <div class="color-circle" style="background: #ffffff;" data-color="#ffffff"></div>
-        <div class="color-circle" style="background: #ff0000;" data-color="#ff0000"></div>
-        <div class="color-circle" style="background: #ff7f00;" data-color="#ff7f00"></div>
-        <div class="color-circle" style="background: #ffff00;" data-color="#ffff00"></div>
-        <div class="color-circle" style="background: #7fff00;" data-color="#7fff00"></div>
-        <div class="color-circle" style="background: #00ffff;" data-color="#00ffff"></div>
-        <div class="color-circle" style="background: #ff00ff;" data-color="#ff00ff"></div>
-        <div class="color-circle" style="background: #7f00ff;" data-color="#7f00ff"></div>
-        <div class="color-circle" style="background: #000000;" data-color="#000000"></div>
-        <div class="color-circle" style="background: #990000;" data-color="#990000"></div>
-        <div class="color-circle" style="background: #b35900;" data-color="#b35900"></div>
-        <div class="color-circle" style="background: #b3b300;" data-color="#b3b300"></div>
-        <div class="color-circle" style="background: #388e3c;" data-color="#388e3c"></div>
-        <div class="color-circle" style="background: #0088ff;" data-color="#0088ff"></div>
-        <div class="color-circle" style="background: #9c27b0;" data-color="#9c27b0"></div>
-        <div class="color-circle" style="background: #0d1b2a;" data-color="#0d1b2a"></div>
+        <div class="inst-card" id="contato">
+          <h3>Contato</h3>
+          <p>Dúvidas, sugestões ou parcerias? Entre em contato conosco através de nossos canais oficiais de suporte.</p>
+        </div>
       </div>
-      <div class="color-custom-row">
-        <div class="current-color-preview" id="currentCustomPreview" style="background-color: #ffffff;"></div>
-        <input type="text" id="colorHexInput" value="#ffffff;">
-        <input type="range" id="colorOpacityRange" min="0" max="100" value="100" style="width: 50px;" title="Opacidade">
-        <span id="opacityLabel" style="font-size: 10px;">100%</span>
-      </div>
-
-      
-
-
-    </div>
-    
-  </div>
-
-  <div class="tool-divider"></div>
-
-  <!-- Seletor de Tamanho da Fonte -->
-  <div class="tool-select-wrapper">
-    <select id="toolbarFontSize" class="tool-select">
-      <option value="20">20</option>
-      <option value="30">30</option>
-      <option value="40">40</option>
-      <option value="50">50</option>
-      <option value="60" selected>60</option>
-      <option value="70">70</option>
-      <option value="80">80</option>
-      <option value="90">90</option>
-      <option value="100">100</option>
-    </select>
-    <span class="tool-arrow">▾</span>
-  </div>
-
-  <div class="tool-divider"></div>
-
-  <!-- Botões de Formatação -->
-  <button id="toolbarBold" class="tool-btn format-btn" type="button" title="Negrito">N</button>
-  <button id="toolbarItalic" class="tool-btn format-btn" type="button" title="Itálico">I</button>
-  <button id="toolbarUnderline" class="tool-btn format-btn" type="button" title="Sublinhado">S</button>
-
-  <div class="tool-divider"></div>
-
-  <!-- Ações -->
-
-  <button id="toolbarDelete" class="tool-btn" type="button" title="Excluir">🗑️</button>
-</div>
-          
-        </figure>
-      </section>
-
-    </div>
-<!-- BARRA DE OVERLAYS / EFEITOS POR CIMA -->
-<div class="overlays-bar" aria-label="Efeitos por cima da imagem">
-      <span class="overlays-title">Efeitos:</span>
-      <div class="overlays-track" id="overlaysTrack"></div>
-    </div>
-
-    <!-- 4. BARRA INFERIOR COM OS 23 EFEITOS -->
-    <footer class="footer-effects" aria-label="Seleção de Efeitos 3D">
-      <div class="effects-track" id="effectsTrack"></div>
-    </footer>
+    </main>
 
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script type="module" src="js/app.js"></script>
+  <script>
+    // Script leve apenas para controlar o menu hamburguer da landing page
+    const btnHamburger = document.getElementById('btnHamburger');
+    const btnCloseDrawer = document.getElementById('btnCloseDrawer');
+    const navDrawer = document.getElementById('navDrawer');
+    const navOverlay = document.getElementById('navOverlay');
+
+    const openDrawer = () => {
+      if (navDrawer && navOverlay) {
+        navDrawer.classList.add('open');
+        navOverlay.classList.add('active');
+      }
+    };
+
+    const closeDrawer = () => {
+      if (navDrawer && navOverlay) {
+        navDrawer.classList.remove('open');
+        navOverlay.classList.remove('active');
+      }
+    };
+
+    if (btnHamburger) btnHamburger.addEventListener('click', openDrawer);
+    if (btnCloseDrawer) btnCloseDrawer.addEventListener('click', closeDrawer);
+    if (navOverlay) navOverlay.addEventListener('click', closeDrawer);
+
+    document.querySelectorAll('.drawer-item').forEach(link => {
+      link.addEventListener('click', closeDrawer);
+    });
+  </script>
 </body>
 </html>
