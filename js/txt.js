@@ -167,4 +167,19 @@ export class TextEditor {
       this.selectFont(this.currentFont);
     }
   }
-}
+}document.addEventListener('pointerdown', (e) => {
+  const toolbar = document.getElementById('textFloatingToolbar');
+  const colorPopup = document.getElementById('colorPopup');
+  
+  const clickedInsideText = e.target.closest('.canva-text-wrapper');
+  const clickedInsideToolbar = toolbar && toolbar.contains(e.target);
+  const clickedInsidePopup = colorPopup && colorPopup.contains(e.target);
+
+  // Se clicou fora da caixa de texto, da barra e do popup (qualquer ponto do slide ou fundo)
+  if (!clickedInsideText && !clickedInsideToolbar && !clickedInsidePopup) {
+    document.querySelectorAll('.canva-text-wrapper').forEach(el => el.classList.remove('active'));
+    if (toolbar) toolbar.style.display = 'none';
+    if (colorPopup) colorPopup.style.display = 'none';
+    window.activeTextElement = null;
+  }
+});

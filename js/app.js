@@ -612,3 +612,98 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+document.addEventListener('DOMContentLoaded', () => {
+  let isDragging = false;
+  let isResizing = false;
+  let currentWrapper = null;
+  let startX = 0, startY = 0;
+  let initialX = 0, initialY = 0;
+  let startWidth = 0;
+  let startFontSize = 60;
+  let resizeHandleType = null;
+
+  document.addEventListener('pointerdown', (e) => {
+    // 1. Redimensionamento pelas alças
+    if (e.target.classList.contains('resize-handle')) {
+      e.stopPropagation();
+      isResizing = true;
+      currentWrapper = e.target.closest('.canva-text-wrapper');
+      startX = e.clientX;
+      startWidth = currentWrapper.offsetWidth;
+      
+      const textEl = currentWrapper.querySelector('.interactive-text-box');
+      if (textEl) {
+        startFontSize = parseInt(window.getComputedStyle(textEl).fontSize, 10);
+      }
+      
+      resizeHandleType = e.target.classList.contains('tl') || e.target.classList.contains('bl') ? 'left' : 'right';
+      
+      if (e.target.setPointerCapture) {
+        e.target.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+
+    // 2. Arraste da caixa de texto
+    const wrapper = e.target.closest('.canva-text-wrapper');
+    if (wrapper && !e.target.classList.contains('rotate-handle') && !e.target.isContentEditable) {
+      currentWrapper = wrapper;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      const rect = currentWrapper.getBoundingClientRect();
+      const parentRect = currentWrapper.parentElement.getBoundingClientRect();
+      
+      initialX = rect.left - parentRect.left;
+      initialY = rect.top - parentRect.top;
+
+      currentWrapper.style.transform = `translate(${initialX}px, ${initialY}px)`;
+      currentWrapper.style.left = '0px';
+      currentWrapper.style.top = '0px';
+    }
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (!currentWrapper) return;
+
+    if (isDragging) {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      requestAnimationFrame(() => {
+        currentWrapper.style.transform = `translate(${initialX + dx}px, ${initialY + dy}px)`;
+      });
+    }
+
+    if (isResizing) {
+      const dx = e.clientX - startX;
+      // Inverte o delta se puxar pela esquerda para crescer proporcionalmente
+      const multiplier = resizeHandleType === 'left' ? -1 : 1;
+      const newWidth = Math.max(80, startWidth + (dx * multiplier));
+      
+      requestAnimationFrame(() => {
+        currentWrapper.style.width = newWidth + 'px';
+        
+        // Redimensiona a fonte de forma proporcional e suave junto com a largura
+        const textEl = currentWrapper.querySelector('.interactive-text-box');
+        if (textEl) {
+          const scaleFactor = newWidth / startWidth;
+          const newSize = Math.max(16, Math.min(150, Math.round(startFontSize * scaleFactor)));
+          textEl.style.fontSize = newSize + 'px';
+          
+          const toolbarFontSize = document.getElementById('toolbarFontSize');
+          if (toolbarFontSize) toolbarFontSize.value = newSize;
+        }
+      });
+    }
+  });
+
+  const stopInteraction = () => {
+    isDragging = false;
+    isResizing = false;
+    currentWrapper = null;
+  };
+
+  document.addEventListener('pointerup', stopInteraction);
+  document.addEventListener('pointercancel', stopInteraction);
+});
