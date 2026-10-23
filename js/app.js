@@ -195,6 +195,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const btnCloseSidebar = document.getElementById('btnCloseSidebar');
   const sidebarMobileTitle = document.getElementById('sidebarMobileTitle');
   const sectionImages = document.getElementById('sectionImages');
+
+
+  
   const btnToggleText = document.getElementById('btnToggleText');
   const textAccordion = document.getElementById('textAccordion');
 
@@ -262,6 +265,10 @@ window.addEventListener('DOMContentLoaded', () => {
     sidebarOverlay.addEventListener('click', closeMobilePanel);
   }
 
+
+
+
+
 });
 
 
@@ -289,3 +296,319 @@ overlayButtons.forEach(btn => {
     }
   });
 });
+
+
+
+// CONTROLE DOS PAINÉIS INDIVIDUAIS
+  const panelImages = document.getElementById('panelImages');
+  const panelTexts = document.getElementById('panelTexts');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+  const btnMobileAddImg = document.getElementById('btnMobileAddImg');
+  const btnMobileAddTxt = document.getElementById('btnMobileAddTxt');
+  const btnOpenTextDesktop = document.getElementById('btnOpenTextDesktop');
+  const closeButtons = document.querySelectorAll('.btn-close-panel');
+
+  const openSidePanel = (target) => {
+    if (panelImages) panelImages.classList.remove('open');
+    if (panelTexts) panelTexts.classList.remove('open');
+
+    if (target) {
+      target.classList.add('open');
+      if (sidebarOverlay) sidebarOverlay.classList.add('active');
+    }
+  };
+
+  const closeSidePanels = () => {
+    if (panelImages) panelImages.classList.remove('open');
+    if (panelTexts) {
+      panelTexts.classList.remove('open');
+      panelTexts.classList.remove('desktop-show');
+    }
+    if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+  };
+
+  if (btnMobileAddImg) {
+    btnMobileAddImg.addEventListener('click', () => openSidePanel(panelImages));
+  }
+
+  if (btnMobileAddTxt) {
+    btnMobileAddTxt.addEventListener('click', () => openSidePanel(panelTexts));
+  }
+
+  if (btnOpenTextDesktop && panelTexts) {
+    btnOpenTextDesktop.addEventListener('click', () => {
+      panelTexts.classList.toggle('desktop-show');
+    });
+  }
+
+  closeButtons.forEach(btn => btn.addEventListener('click', closeSidePanels));
+  if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidePanels);
+
+
+
+  // Controle interativo da Barra Flutuante de Textos
+document.addEventListener('DOMContentLoaded', () => {
+  const toolbarBold = document.getElementById('toolbarBold');
+  const toolbarItalic = document.getElementById('toolbarItalic');
+  const toolbarUnderline = document.getElementById('toolbarUnderline');
+  const toolbarFontSize = document.getElementById('toolbarFontSize');
+  const toolbarDelete = document.getElementById('toolbarDelete');
+  const toolbarColorBtn = document.getElementById('toolbarColorBtn');
+  const colorPopup = document.getElementById('colorPopup');
+
+  if (toolbarBold) {
+    toolbarBold.addEventListener('click', () => {
+      if (window.activeTextElement) {
+        const isBold = window.activeTextElement.style.fontWeight === 'bold';
+        window.activeTextElement.style.fontWeight = isBold ? 'normal' : 'bold';
+        toolbarBold.classList.toggle('active', !isBold);
+      }
+    });
+  }
+
+  if (toolbarItalic) {
+    toolbarItalic.addEventListener('click', () => {
+      if (window.activeTextElement) {
+        const isItalic = window.activeTextElement.style.fontStyle === 'italic';
+        window.activeTextElement.style.fontStyle = isItalic ? 'normal' : 'italic';
+        toolbarItalic.classList.toggle('active', !isItalic);
+      }
+    });
+  }
+
+  if (toolbarUnderline) {
+    toolbarUnderline.addEventListener('click', () => {
+      if (window.activeTextElement) {
+        const hasUnderline = window.activeTextElement.style.textDecoration.includes('underline');
+        window.activeTextElement.style.textDecoration = hasUnderline ? 'none' : 'underline';
+        toolbarUnderline.classList.toggle('active', !hasUnderline);
+      }
+    });
+  }
+
+  if (toolbarFontSize) {
+    toolbarFontSize.addEventListener('change', (e) => {
+      if (window.activeTextElement) {
+        window.activeTextElement.style.fontSize = e.target.value + 'px';
+      }
+    });
+  }
+
+  if (toolbarDelete) {
+    toolbarDelete.addEventListener('click', () => {
+      if (window.activeTextElement) {
+        const wrapper = window.activeTextElement.closest('.canva-text-wrapper');
+        if (wrapper) wrapper.remove();
+        const toolbar = document.getElementById('textFloatingToolbar');
+        if (toolbar) toolbar.style.display = 'none';
+        window.activeTextElement = null;
+      }
+    });
+  }
+
+  if (toolbarColorBtn && colorPopup) {
+    toolbarColorBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      colorPopup.style.display = colorPopup.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', () => {
+      colorPopup.style.display = 'none';
+    });
+
+    colorPopup.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Seleção de cor na paleta
+    colorPopup.querySelectorAll('.color-circle').forEach(circle => {
+      circle.addEventListener('click', () => {
+        const color = circle.dataset.color;
+        if (window.activeTextElement) {
+          window.activeTextElement.style.color = color;
+          const fill = document.getElementById('toolbarColorFill');
+          if (fill) fill.style.backgroundColor = color;
+        }
+        colorPopup.style.display = 'none';
+      });
+    });
+  }
+});
+
+// Sistema Definitivo de Arraste e Rotação do Texto
+document.addEventListener('DOMContentLoaded', () => {
+  let isDragging = false;
+  let isRotating = false;
+  let currentWrapper = null;
+  let startX = 0, startY = 0;
+  let initialX = 0, initialY = 0;
+  let currentRotation = 0;
+
+  document.addEventListener('mousedown', (e) => {
+    // 1. Clicar nas alças de rotação
+    if (e.target.classList.contains('rotate-handle')) {
+      e.stopPropagation();
+      currentWrapper = e.target.closest('.canva-text-wrapper');
+      isRotating = true;
+      const rect = currentWrapper.getBoundingClientRect();
+      startX = rect.left + rect.width / 2;
+      startY = rect.top + rect.height / 2;
+      return;
+    }
+
+    // 2. Clicar na caixa de texto para arrastar
+    const wrapper = e.target.closest('.canva-text-wrapper');
+    if (wrapper && !e.target.classList.contains('resize-handle')) {
+      currentWrapper = wrapper;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      // Posição atual da caixa em pixels
+      const rect = currentWrapper.getBoundingClientRect();
+      const parentRect = currentWrapper.parentElement.getBoundingClientRect();
+      
+      initialX = rect.left - parentRect.left;
+      initialY = rect.top - parentRect.top;
+
+      currentWrapper.style.transform = `translate(${initialX}px, ${initialY}px) rotate(${currentRotation}deg)`;
+      currentWrapper.style.left = '0px';
+      currentWrapper.style.top = '0px';
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!currentWrapper) return;
+
+    if (isDragging) {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const posX = initialX + dx;
+      const posY = initialY + dy;
+      currentWrapper.style.transform = `translate(${posX}px, ${posY}px) rotate(${currentRotation}deg)`;
+    }
+
+    if (isRotating) {
+      const rect = currentWrapper.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const radians = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+      currentRotation = radians * (180 / Math.PI) + 90;
+      
+      // Mantém a translação atual e aplica a nova rotação
+      const transformMatch = currentWrapper.style.transform.match(/translate\([^)]+\)/);
+      const translatePart = transformMatch ? transformMatch[0] : 'translate(0px, 0px)';
+      currentWrapper.style.transform = `${translatePart} rotate(${currentRotation}deg)`;
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    isRotating = false;
+  });
+});
+
+
+
+
+
+
+
+
+
+// Sistema Profissional e Preciso de Arraste e Redimensionamento (Mouse e Touch)
+document.addEventListener('DOMContentLoaded', () => {
+  let isDragging = false;
+  let isResizing = false;
+  let currentWrapper = null;
+  let startX = 0, startY = 0;
+  let initialX = 0, initialY = 0;
+  let startWidth = 0;
+  let isResizeWidth = false;
+
+  document.addEventListener('pointerdown', (e) => {
+    // 1. Inicia o Redimensionamento apenas se clicar exatamente na alça
+    if (e.target.classList.contains('resize-handle')) {
+      e.stopPropagation();
+      isResizing = true;
+      currentWrapper = e.target.closest('.canva-text-wrapper');
+      startX = e.clientX;
+      startWidth = currentWrapper.offsetWidth;
+      isResizeWidth = e.target.classList.contains('left') || e.target.classList.contains('right');
+      
+      if (e.target.setPointerCapture) {
+        e.target.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+
+    // 2. Inicia o Arraste da Caixa
+    const wrapper = e.target.closest('.canva-text-wrapper');
+    if (wrapper && !e.target.classList.contains('rotate-handle')) {
+      currentWrapper = wrapper;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      const rect = currentWrapper.getBoundingClientRect();
+      const parentRect = currentWrapper.parentElement.getBoundingClientRect();
+      
+      initialX = rect.left - parentRect.left;
+      initialY = rect.top - parentRect.top;
+
+      currentWrapper.style.transform = `translate(${initialX}px, ${initialY}px)`;
+      currentWrapper.style.left = '0px';
+      currentWrapper.style.top = '0px';
+    }
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (!currentWrapper) return;
+
+    // Se estiver arrastando a caixa
+    if (isDragging) {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const posX = initialX + dx;
+      const posY = initialY + dy;
+      currentWrapper.style.transform = `translate(${posX}px, ${posY}px)`;
+    }
+
+    // Se estiver redimensionando pelas alças
+    if (isResizing) {
+      const dx = e.clientX - startX;
+      const parentWidth = currentWrapper.parentElement.clientWidth;
+      
+      if (isResizeWidth) {
+        // Redimensiona a largura de forma fluida e controlada pelo movimento real
+        const newWidth = Math.min(parentWidth - 10, Math.max(80, startWidth + dx));
+        currentWrapper.style.width = newWidth + 'px';
+      } else {
+        // Redimensiona a fonte pelos cantos
+        const textEl = currentWrapper.querySelector('.interactive-text-box');
+        if (textEl) {
+          let currentSize = parseInt(window.getComputedStyle(textEl).fontSize);
+          const newSize = Math.max(16, currentSize + (e.movementX * 0.4 || dx * 0.1)); 
+          textEl.style.fontSize = newSize + 'px';
+        }
+      }
+    }
+  });
+
+  // Para o evento imediatamente ao soltar o dedo ou o mouse
+  const stopInteraction = () => {
+    isDragging = false;
+    isResizing = false;
+    currentWrapper = null;
+  };
+
+  document.addEventListener('pointerup', stopInteraction);
+  document.addEventListener('pointercancel', stopInteraction);
+});
+
+
+
+
+
+
