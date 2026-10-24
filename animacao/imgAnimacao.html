@@ -5,62 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slideshow Líquido Automático - Three.js</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background-color: #0b0b0b;
-    }
-
-    #webgl-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-    }
-
-    #image-source-list {
-      display: none;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 100vw; height: 100vh; overflow: hidden; background-color: #0b0b0b; }
+    #webgl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    #image-source-list { display: none; }
   </style>
 </head>
 <body>
-
   <div id="image-source-list"></div>
   <div id="webgl-canvas"></div>
 
-  <!-- Bibliotecas externas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
   <script>
-    // 1. Variáveis de controlo declaradas no topo com let
     let textures = [];
     let currentIndex = 0;
     let isAnimating = false;
     let autoPlayTimer = null;
 
-    // 2. Setup Three.js
     const container = document.getElementById('webgl-canvas');
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // preserveDrawingBuffer obrigatório para o gravador ler o canvas sem ficar preto
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
     const loader = new THREE.TextureLoader();
 
-    // 3. Shaders GLSL para distorção líquida
     const vertexShader = `
       varying vec2 vUv;
       void main() {
@@ -78,7 +53,6 @@
 
       void main() {
         vec2 uv = vUv;
-
         vec2 wave = vec2(
           sin(uv.y * 12.0 + uProgress * 6.28) * 0.05,
           cos(uv.x * 12.0 + uProgress * 6.28) * 0.05
@@ -91,7 +65,6 @@
       }
     `;
 
-    // 4. Uniforms com valores padrão seguros
     const uniforms = {
       uTextureCurrent: { value: null },
       uTextureNext: { value: null },
@@ -107,16 +80,14 @@
 
     const geometry = new THREE.PlaneGeometry(2, 2);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.visible = false; // Só fica visível quando as fotos chegarem
+    mesh.visible = false;
     scene.add(mesh);
 
-    // 5. Função de transição protegida contra arrays vazios
     function goToNextSlide() {
       if (isAnimating || !textures.length || textures.length < 2) return;
       isAnimating = true;
 
       const nextIndex = (currentIndex + 1) % textures.length;
-
       uniforms.uTextureCurrent.value = textures[currentIndex];
       uniforms.uTextureNext.value = textures[nextIndex];
       uniforms.uProgress.value = 0.0;
@@ -134,10 +105,8 @@
       });
     }
 
-    // 6. Receção das fotografias enviadas pelo painel principal
     function aplicarFotos(listaFotos) {
       if (!listaFotos || listaFotos.length < 2) return;
-
       textures = listaFotos.map(url => loader.load(url));
       currentIndex = 0;
       isAnimating = false;
@@ -147,7 +116,6 @@
       uniforms.uProgress.value = 0.0;
       mesh.visible = true;
 
-      // Inicia ou reinicia a transição automática
       clearInterval(autoPlayTimer);
       autoPlayTimer = setInterval(goToNextSlide, 3000);
     }
@@ -158,17 +126,14 @@
       }
     });
 
-    // Função de suporte direto se chamada pelo app.js
     window.atualizarTexturas = function(novosLinks) {
       aplicarFotos(novosLinks);
     };
 
-    // 7. Responsividade
     window.addEventListener('resize', () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // 8. Loop de renderização contínuo
     function render() {
       requestAnimationFrame(render);
       if (mesh.visible) {
@@ -177,7 +142,6 @@
     }
     render();
 
-    // 9. Avisa o app.js pai que o iframe está pronto para receber as fotos
     window.parent.postMessage({ tipo: 'IFRAME_PRONTO' }, '*');
   </script>
 </body>

@@ -33,7 +33,7 @@ html, body {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.getElementById('webgl-container').appendChild(renderer.domElement);
@@ -52,6 +52,8 @@ html, body {
       return new THREE.CanvasTexture(canvas);
     }
 
+
+    
     // TEXTURA 2: Estrela de 4 pontas brilhante (Dourada/Amarela)
     function createYellowStarTexture() {
       const canvas = document.createElement('canvas');

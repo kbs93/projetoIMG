@@ -5,12 +5,13 @@ export class OverlaysManager {
     this.overlayFrame = document.getElementById(options.frameId || 'overlayFrame');
     
     // Lista oficial dos efeitos de sobreposição (Overlays)
- this.effects = [
+    this.effects = [
       { id: 'none', name: 'Nenhum', src: '' },
       { id: 'efeito2', name: 'Túnel Neon', src: 'efeito/efeito2.html' },
       { id: 'efeito3', name: 'Meteoro', src: 'efeito/efeito3.html' },
       { id: 'efeito4', name: 'Estrelas 3D', src: 'efeito/efeito4.html' },
-      { id: 'efeito5', name: 'Bokeh 3D', src: 'efeito/efeito5.html' }
+      { id: 'efeito5', name: 'Bokeh 3D', src: 'efeito/efeito5.html' },
+      { id: 'efeito6', name: 'Rastros 3D', src: 'efeito/efeito6.html' }
     ];
 
     this.currentEffectId = 'none';
@@ -19,7 +20,7 @@ export class OverlaysManager {
     this.renderButtons();
   }
 
-  // 1. Garante que o iframe transparente exista no DOM sem precisar digitar HTML manual
+  // 1. Garante que o iframe transparente exista no DOM
   ensureOverlayFrame() {
     if (!this.overlayFrame) {
       this.overlayFrame = document.getElementById('overlayFrame');
@@ -42,7 +43,7 @@ export class OverlaysManager {
     }
   }
 
-  // 2. Cria os botões dinamicamente no track, exatamente igual aos slides
+  // 2. Cria os botões dinamicamente no track
   renderButtons() {
     if (!this.trackContainer) {
       this.trackContainer = document.getElementById('overlaysTrack');
@@ -72,7 +73,6 @@ export class OverlaysManager {
     const selected = this.effects.find(e => e.id === effectId) || this.effects[0];
     this.currentEffectId = selected.id;
 
-    // Atualiza estado visual dos botões
     if (this.trackContainer) {
       const buttons = this.trackContainer.querySelectorAll('.btn-overlay');
       buttons.forEach(btn => {
@@ -84,7 +84,6 @@ export class OverlaysManager {
       });
     }
 
-    // Garante referência ao iframe
     this.ensureOverlayFrame();
     if (!this.overlayFrame) return;
 
